@@ -156,7 +156,7 @@ function runtask(){
           function onMistake() {
               progress -= 0.05;
               document.getElementById('progress').value = progress;
-              return document.getElementById("buzzer").play();
+              return document.getElementById("buzzer").play().then(idle(1000));
           }
 
           repeatAfterMe(['ABC', 'my name is' , 'Which witch watches which swatch watch',
