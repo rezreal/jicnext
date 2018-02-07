@@ -6,7 +6,6 @@ speechSynthesis.getVoices();
 
 window.speechSynthesis.onvoiceschanged = function() {
     const voices = speechSynthesis.getVoices();
-    console.info(voices);
     const offlineVoice = voices.find((v) =>
         v.localService === true && v.lang.indexOf('en') === 0 && (v.name.toLocaleLowerCase().includes('female') || v.name.toLocaleLowerCase().includes('Victoria')));
 
@@ -15,13 +14,36 @@ window.speechSynthesis.onvoiceschanged = function() {
 };
 
 
-
-
 // store speechSynchesisUtterance object to migitate https://bugs.chromium.org/p/chromium/issues/detail?id=509488#c11
 window.utterances = [];
 
-function say(sentence, andThen) {
-    console.info("saying " + sentence, andThen);
+/**
+ * Called after doing asynchronous stuff.
+ * @callback promiseFunction
+ * @param {*} value
+ * @return {Promise<*>}
+ */
+
+/**
+ * A idle then composition. Suspends a promise chain by a given number of milliseconds and then repeats with the original value.
+ * @param {number} millis
+ * @return {promiseFunction}
+ */
+function idle(millis) {
+    return function(value) {
+        return new Promise((resolve) => {
+            setTimeout(() => resolve(value), millis);
+        });
+    }
+}
+
+/**
+ * @param sentence
+ * @return Promise<any>
+ */
+function say(sentence) {
+
+    console.info("saying " + sentence);
 
     const saying = new SpeechSynthesisUtterance(sentence);
     saying.lang = 'en-GB';
@@ -32,22 +54,15 @@ function say(sentence, andThen) {
 
     window.utterances.push(saying);
 
-    saying.onend = (e) => {
-        currentSaying = undefined;
-        if (andThen) {
-            andThen(e);
-        }
-    }
-
-    saying.onstart = (e) => {
-        currentSaying = saying;
-    }
+    const promise = new Promise((resolve, reject) => {
+        saying.onend = resolve;
+        saying.onerror = reject
+    });
 
     window.speechSynthesis.speak(saying);
 
+    return promise;
 }
-
-var currentSaying = undefined;
 
 
 
@@ -57,24 +72,20 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
 const SpeechRecognitionEvent = window.SpeechRecognitionEvent || window.webkitSpeechRecognitionEvent;
 
-
-
-const mediaConstraints = {
-    audio: true
-};
-
 /**
- navigator.getUserMedia(mediaConstraints, onAudioStream, (err) => console.info("could not access audio", err));
 
- function onAudioStream(stream) {
+const mediaConstraints = { audio: true };
 
-	console.info("have the stream", stream);
-	const mediaRecorder = new MediaRecorder(stream);
-	mediaRecorder.mimeType = 'audio/webm';
-	mediaRecorder.start();
-}
- **/
-
+navigator.getUserMedia(mediaConstraints)
+     .then((stream) => {
+         console.info("I have a stream", stream);
+         const mediaRecorder = new MediaRecorder(stream);
+         mediaRecorder.mimeType = 'audio/webm';
+         mediaRecorder.start();
+     }).catch((e) => {
+         console.error("Error using audio", e);
+     });
+**/
 window.currentRecognition = undefined;
 
 
@@ -94,13 +105,13 @@ window.onload = function() {
         };
 
         recognition.onerror = function(event) {
-            if (event.error == 'no-speech') {
+            if (event.error === 'no-speech') {
                 console.info('no-speech');
             }
-            if (event.error == 'audio-capture') {
+            if (event.error === 'audio-capture') {
                 console.info('audio-capture');
             }
-            if (event.error == 'not-allowed') {
+            if (event.error === 'not-allowed') {
                 if (event.timeStamp - start_timestamp < 100) {
                     console.info('info_blocked');
                 } else {
@@ -113,20 +124,85 @@ window.onload = function() {
     });
 };
 
+/**
+ * @callback onProgressCallback
+ * @
+ */
 
-function repeatAfterMe(expectedSentence, onFinished, onError) {
+/**
+ * Let the user repeat all sentences.
+ * @param {string | Array<string>} sentences
+ * @param {onProgressCallback} onProgress
+ * @param {Function} onSuccess - called when all sentences have been repeated successfully.
+ * @param {Function<Promise<null>>} onMistake - called when the user makes a mistake. Continues when the promise returned by the mistake resolves.
+ */
+function repeatAfterMe(sentences, onProgress, onSuccess, onMistake) {
+    if (sentences.length === 0) {
+        onSuccess();
+        return;
+    }
 
-    console.info("start recognition: ", expectedSentence);
-    const grammar = '#JSGF V1.0; grammar phrase; public <phrase> = ' + expectedSentence +';';
-    const recognition = new SpeechRecognition();
+    const [sentence, ...remainingSentences] = sentences;
+
+    function onSentenceComplete() {
+        onProgress(() => {
+            repeatAfterMe(remainingSentences, onProgress, onSuccess, onMistake);
+        });
+    }
+    function onSentenceError() {
+        if (onMistake) {
+            onMistake().then(() => repeatAfterMe(sentences, onProgress, onSuccess, onMistake));
+        } else {
+            setTimeout(() => repeatAfterMe(sentences, onProgress, onSuccess, onMistake),0);
+        }
+    }
+
+    say(sentence)
+        .then(() => choose([sentence], [onSentenceComplete], onSentenceError, true) );
+}
+
+/**
+ * @callback chooseOnError
+ * @param {string} the sentence that could not be recognized.
+ */
+
+/**
+ * Recognizes one of the given expected sentences.
+ * When the n-th sentence is recognized, the nth- onFinished callback is fired.
+ * When no sentence is recognized, the onError callback is fired.
+ * @param {string | Array<string>} expectedSentences
+ * @param {Function | Array<Function>} onFinished
+ * @param {chooseOnError} onError
+ * @param {boolean?} stopOnError weather we should stop retrying to recognize after a failed attempt.
+ * @return {Function} stopFunction
+ */
+function choose(expectedSentences, onFinished, onError, stopOnError) {
+
+    if (!(expectedSentences instanceof Array)) {
+        expectedSentences = [ expectedSentences ];
+    }
+    if (!(onFinished instanceof Array)) {
+        onFinished = [ onFinished ];
+    }
+
+
+
     const speechRecognitionList = new SpeechGrammarList();
-    let haveResult = false;
-    speechRecognitionList.addFromString(grammar, 1);
+
+    expectedSentences.forEach((expectedSentence) => {
+        const grammar = `#JSGF V1.0; grammar phrase; public <phrase> = ${expectedSentence}`;
+        speechRecognitionList.addFromString(grammar, 1);
+    });
+
+    const recognition = new SpeechRecognition();
     recognition.grammars = speechRecognitionList;
     recognition.lang = 'en-GB';
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.continuous = true;
+
+    let haveResult = false;
+    let haveAbort = false;
 
     recognition.onspeechstart = function(e) {
         document.getElementById("mic").classList.add("talking");
@@ -136,41 +212,55 @@ function repeatAfterMe(expectedSentence, onFinished, onError) {
     recognition.onspeechend = function(e) {
         document.getElementById("mic").classList.remove("talking");
         console.info("onSpeechEnd", e);
-        //recognition.stop();
     };
 
-    recognition.onend = function() {
+    recognition.onend = function(endEvent) {
+        console.info("endRecognition recognition: ", expectedSentences, endEvent);
+        window.currentRecognition = undefined;
         document.getElementById("siri_end").play();
         document.getElementById("mic").classList.remove("active");
-        if (!haveResult) {
+        if (!haveResult && !haveAbort) {
             recognition.start();
         }
     };
 
+    recognition.onnomatch = function() {
+        console.info('onnomatch');
+    };
+
     recognition.onstart = function() {
+        console.info("start recognition: ", expectedSentences);
+        window.currentRecognition = recognition;
         document.getElementById("mic").classList.add("active");
         document.getElementById("siri_start").play();
     };
 
     recognition.onresult = function(event) {
+        const idx = event.resultIndex;
 
-        const speechResult = event.results[event.results.length - 1][0].transcript;
-        const confidence = event.results[event.results.length - 1][0].confidence;
-        console.info("onresult", speechResult, event);
+        const speechResult = event.results[idx][0].transcript;
 
-        if(speechResult.trim() === expectedSentence && confidence > 0.7) {
-            onFinished(speechResult, event.results[0][0].confidence);
-            haveResult = true;
-            recognition.stop();
-        } else {
-            if (onError) {
-                onError(speechResult);
+        const confidence = event.results[idx][0].confidence;
+        console.info("onresult", [speechResult], event);
+
+        expectedSentences.forEach((expectedSentence, i) => {
+            if(speechResult.trim().toLocaleLowerCase() === expectedSentence.toLocaleLowerCase() && confidence > 0.6) {
+                haveResult = true;
+                recognition.stop();
+                onFinished[i](speechResult, event.results[0][0].confidence);
             }
+        });
+
+        if (!haveResult && stopOnError === true) {
+            haveAbort = true;
+            recognition.stop();
         }
 
+        if (!haveResult && !!onError) {
+            onError(speechResult);
+        }
     };
 
-    window.currentRecognition = recognition;
     recognition.start();
-    return recognition.stop;
+    return () => { return recognition.stop() };
 }

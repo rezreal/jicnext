@@ -82,10 +82,10 @@ function runtask(){
 			fetlife = document.getElementById("fetlife").value;
 			referred = document.getElementById("referred").value;
 			
-			if ((real_name == "") || (user_email == "")) {
-				two.innerHTML = ""
-				three.innerHTML = ""
-			  	say("Well thats an interesting name and email address. Think we will have to try again.", () => setTimeout(runtask, 2000));
+			if ((real_name === "") || (user_email === "")) {
+				two.innerHTML = "";
+				three.innerHTML = "";
+			  	say("Well that's an interesting name and email-address. Think we will have to try again.").then(idle(2000)).then(runtask);
 				cline = 1; // actually two but it is incremented
 				return;
             }
@@ -98,7 +98,7 @@ function runtask(){
 	      if (workingcam) {
 			one.src="lib_image/jen1.jpg";
 			two.innerHTML = "";
-			say("Well hello there, It's nice to meet you, what do you think we should do?", () => setTimeout(runtask, 1000));
+			say("Well hello there, It's nice to meet you, what do you think we should do?").then(idle(1000)).then(runtask);
             
 			
           } else {
@@ -108,35 +108,69 @@ function runtask(){
 	      break;
       case 2:
 //	      one.src="lib_image/01.jpg";  
-	      
-		  say("But before we get started I think it would be nice to know a litle about you? Please say 'i am ready' when you have entered your details.",
-		  	() => repeatAfterMe("I am ready", runtask, () => say('I could not understand you. Please say "i am ready" when you are ready.')));
+          one.src="lib_image/jen2.jpg";
+		  say('But before we get started I think it would be nice to know a little about you? Please say "I am ready" when you have entered your details.')
+              .then(() => choose('I am ready', runtask, () => say('I could not understand you. Please say "I am ready" when you are ready.')));
  	      three.innerHTML = "Name: <input type=\"text\" name=\"msg\" id=\"username\" size=\"20\"><br>Email: <input type=\"email\" name=\"msg\" id=\"useremail\" size=\"40\"><br>Fetlife username (if have one): <input type=\"text\" name=\"msg\" id=\"fetlife\" size=\"20\"><br>Referred by (if anyone): <input type=\"text\" name=\"msg\" id=\"referred\" size=\"20\">";
 	      break;
       case 3:
-one.src="lib_image/jen2.jpg";
+          one.src="lib_image/jen3.jpg";
 
-		say("Ok "+real_name+",You look like you have a bulge in your trousers already and we haven't even got started. Shall we play a little game of you show me yours and then I will show you mine? and then we may have a little play after that");
-		say("When you are ready say 'Yes, sounds fun'", () => repeatAfterMe('yes sounds fun', runtask, () => say("I could not understand you, please repeat")));
-		  
-		   addlog("Level:" + level);
-	      addlog("Name:" + real_name);
-	      addlog("Fetlife:" + fetlife);
-	      addlog("Referred:" + referred);		  
-			addlog("Sex:Male");addlog("Orientation:Heterosexual");		  
-			send_photo();
-		  break;
+		say(`Ok ${real_name}, you look like you have a bulge in your trousers already and we haven't even got started. Shall we play a little game of you show me yours and then I will show you mine? and then we may have a little play after that`);
+		say('When you are ready say "Yes, sounds fun"')
+            .then(() => choose('yes sounds fun', runtask, () => say('I could not understand you, please repeat')));
+		addlog("Level:" + level);
+	    addlog("Name:" + real_name);
+	    addlog("Fetlife:" + fetlife);
+	    addlog("Referred:" + referred);
+		addlog("Sex:Male");addlog("Orientation:Heterosexual");
+		send_photo();
+		break;
       case 4:
-one.src="lib_image/jen3.jpg";
+          one.src="lib_image/jen4.jpg";
 	      two.innerHTML = "";
-		  say("Lets get you naked first, " + real_name + " - don't worry I will look away till you're nice and aroused ...");
-          setTimeout("runtask()",(7*1000));		  
-	      break;		  
-
+		  say("Do you feel adventurous today " + real_name + "? yes or no?").then(() => choose(['yes', 'no'], [runtask, ()=> {cline = 98; runtask(); return true;}]));
+	      break;
       case 5:
-	  	say("Say 'Naked' when you are ready.", () => repeatAfterMe('naked', () => say("Okay, this was just a demo. We won't continue here."), () => say("please say naked!")));
-		break;		  
-	  
+	  	  say("I really like to hear you speak to me. I want you to repeat after me the following sentence until you filled the bar. Are you ready")
+              .then(() => choose(['yes', 'no'], [runtask, ()=> {cline = 98; runtask();}]));
+		break;
+      case 6:
+
+          two.innerHTML = "Repeat after me!: ";
+          three.innerHTML = `<progress max="1" value="0" id="progress">`;
+          let progress = 0.1;
+          document.getElementById('progress').value = progress;
+
+          function onProgress(continueCb) {
+              progress += 0.20;
+              document.getElementById('progress').value = progress;
+
+              if (progress >= 1) {
+                  say("Congratulations! You made it!").then(runtask);
+              } else {
+                  continueCb();
+              }
+          }
+
+          function onMistake() {
+              progress -= 0.05;
+              document.getElementById('progress').value = progress;
+              return document.getElementById("buzzer").play();
+          }
+
+          repeatAfterMe(['ABC', 'my name is' , 'Which witch watches which swatch watch',
+              'the answer of life the universe and everything is 42',
+              'How much wood would a woodchuck chuck', 'If a woodchuck could chuck wood',
+              'I could do this the whole day', 'I know a nice pancake recipe',
+              'Why do you think are we doing this'], onProgress, ()=>undefined, onMistake);
+
+          break;
+
+      case 99:
+          one.src="lib_image/jen1.jpg";
+          say("Oh that is too bad. See you. Reload the page to start over again.");
+          break;
 	}
 }
 </script>
@@ -147,8 +181,9 @@ one.src="lib_image/jen3.jpg";
 	<audio src="camera_click.ogg" preload="auto" id="camera_click"></audio>
 	<audio src="siri_start.ogg" preload="auto" id="siri_start"></audio>
 	<audio src="siri_end.ogg" preload="auto" id="siri_end"></audio>
+	<audio src="portal2buzzer.mp3" preload="auto" id="buzzer"></audio>
 
-	<img id="one" src="lib_image/jen1.jpg"width="100%" />
+	<img id="one" src="lib_image/jen1.jpg" width="100%" />
 <div id="mtext">
 <div id="messagebox">
 <p  id="two" >Loading task...</p>
@@ -183,7 +218,7 @@ one.src="lib_image/jen3.jpg";
 var workingcam = true;
 var reallyWorkingcam = true;
 var workingmic = true;
-var video = document.querySelector("#videoElement");
+var video = document.getElementById("videoElement");
 var videoSelect = document.querySelector('select#videoSource');
  
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
@@ -291,10 +326,11 @@ function send_photo(secret) {
                 xhr.upload.onprogress = function(e) {				
                 };  
       xhr.onload = function() {
-        var u_image = xhr.responseText;
-	    one.src = u_image;
+          var u_image = xhr.responseText;
       };
-      xhr.send(fd);
+      one.src = dataURL;
+      // nope, we are not sending anything
+      //xhr.send(fd);
 	}
   }
 }
