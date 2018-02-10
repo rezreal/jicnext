@@ -33,6 +33,15 @@ body {
     animation-timing-function: ease-out;
 }
 
+span.recordSentence {
+    color: darkgray;
+}
+
+span.recordSentence.currentSentence {
+    color: darkgreen;
+    font-weight: bold;
+}
+
 @keyframes pulsate {
     0% { filter: opacity(1); transform: scale(1) }
     50% { filter: opacity(0.8); transform: scale(0.9) }

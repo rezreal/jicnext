@@ -72,20 +72,23 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
 const SpeechRecognitionEvent = window.SpeechRecognitionEvent || window.webkitSpeechRecognitionEvent;
 
-/**
+
 
 const mediaConstraints = { audio: true };
 
-navigator.getUserMedia(mediaConstraints)
+
+let recordStream = undefined;
+
+navigator.mediaDevices.getUserMedia(mediaConstraints)
      .then((stream) => {
+         recordStream = stream;
          console.info("I have a stream", stream);
-         const mediaRecorder = new MediaRecorder(stream);
-         mediaRecorder.mimeType = 'audio/webm';
-         mediaRecorder.start();
      }).catch((e) => {
          console.error("Error using audio", e);
      });
-**/
+
+
+
 window.currentRecognition = undefined;
 
 
@@ -162,6 +165,99 @@ function repeatAfterMe(sentences, onProgress, onSuccess, onMistake) {
 }
 
 /**
+ * @callback sentenceCallback
+ * @param {string} sentence
+ */
+
+/**
+ * Records a sentence and returns a blob containing the successfully recorded sentence as audio/ogg opus
+ * @param {string} sentence
+ * @param {sentenceCallback} onBeforeSentence
+ * @param {sentenceCallback} onSentenceComplete
+ * @return {Promise<Blob>} the recorded mediaStream
+ */
+function record(sentence, onBeforeSentence, onSentenceComplete) {
+
+    if (recordStream === undefined) throw new Error('Record stream not available');
+
+    const options = {mimeType: 'audio/webm;codecs=opus'};
+    const mediaRecorder = new MediaRecorder(recordStream, options);
+    let buffer = [];
+    mediaRecorder.ondataavailable = (e) => buffer.push(e.data);
+
+    return new Promise((resolve, reject) => {
+
+        let recordedSuccessfully = false;
+        mediaRecorder.onstop = (e) => {
+
+            console.info('stopped successfully:', recordedSuccessfully);
+            if (recordedSuccessfully) {
+                const blob = new Blob(buffer, { 'type' : 'audio/ogg; codecs=opus' });
+                onSentenceComplete(sentence);
+                resolve(blob);
+            } else {
+                record(sentence, onBeforeSentence, onSentenceComplete).then(resolve, reject);
+            }
+        };
+
+        mediaRecorder.onerror = (err) => reject(err);
+
+        choose(sentence, () => {
+            recordedSuccessfully  = true;
+            mediaRecorder.stop();
+        }, () => mediaRecorder.stop(), true,
+               (speechStarts) => {  if (mediaRecorder.state !== 'recording') mediaRecorder.start()},
+               (speechEnds) => { if (mediaRecorder.state === 'recording') mediaRecorder.pause()});
+        onBeforeSentence(sentence);
+    });
+}
+
+
+
+/**
+ *
+ * @param {Array<string>} sentences
+ * @param {sentenceCallback} onBeforeSentence
+ * @param {sentenceCallback} onSentenceComplete
+ * @return {Promise<Array<Blob>>} the recorded chunks
+ */
+function recordAll(sentences, onBeforeSentence, onSentenceComplete) {
+    if (!(sentences instanceof Array)) {
+        sentences = [ sentences ];
+    }
+    const [sentence, ...remainingSentences] = sentences;
+    if (sentences.length === 0) {
+        return Promise.resolve([]);
+    }
+    return record(sentence, onBeforeSentence, onSentenceComplete)
+        .then((blob) =>
+                  recordAll(remainingSentences, onBeforeSentence, onSentenceComplete)
+                      .then((blobs) => {blobs.unshift(blob); return blobs;}));
+}
+
+/**
+ *
+ * @return {Promise<void>} then the playback is done
+ */
+function playAudioBlob(blob) {
+    const audioElement = document.createElement('audio');
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        audioElement.autoplay = true;
+        const source = document.createElement('source');
+        source.type = 'audio/webm';
+        source.src = url;
+        source.volume = 1;
+        audioElement.appendChild(source);
+        document.body.appendChild(audioElement);
+        audioElement.onended = resolve;
+        audioElement.onerror = reject;
+    }).finally(() => document.body.removeChild(audioElement));
+}
+
+
+
+/**
  * @callback chooseOnError
  * @param {string} the sentence that could not be recognized.
  */
@@ -174,9 +270,11 @@ function repeatAfterMe(sentences, onProgress, onSuccess, onMistake) {
  * @param {Function | Array<Function>} onFinished
  * @param {chooseOnError} onError
  * @param {boolean?} stopOnError weather we should stop retrying to recognize after a failed attempt.
+ * @param {Function?} onSoundStart Called when the speech starts.
+ * @param {Function?} onSpeechEnd Called when the speech ends.
  * @return {Function} stopFunction
  */
-function choose(expectedSentences, onFinished, onError, stopOnError) {
+function choose(expectedSentences, onFinished, onError, stopOnError, onSoundStart, onSpeechEnd) {
 
     if (!(expectedSentences instanceof Array)) {
         expectedSentences = [ expectedSentences ];
@@ -185,12 +283,15 @@ function choose(expectedSentences, onFinished, onError, stopOnError) {
         onFinished = [ onFinished ];
     }
 
-
-
     const speechRecognitionList = new SpeechGrammarList();
 
+    function sanitize(input) {
+        return input.replace('.','').replace(',', ' ').toLocaleLowerCase().trim();
+    }
+
     expectedSentences.forEach((expectedSentence) => {
-        const grammar = `#JSGF V1.0; grammar phrase; public <phrase> = ${expectedSentence}`;
+        const sanitized = sanitize(expectedSentence);
+        const grammar = `#JSGF V1.0; grammar phrase; public <phrase> = ${sanitized}`;
         speechRecognitionList.addFromString(grammar, 1);
     });
 
@@ -204,14 +305,27 @@ function choose(expectedSentences, onFinished, onError, stopOnError) {
     let haveResult = false;
     let haveAbort = false;
 
+    recognition.onsoundstart = (e) => {
+        console.info("onSoundStart", e);
+        if (onSoundStart) {
+            onSoundStart(e);
+        }
+    };
+
     recognition.onspeechstart = function(e) {
         document.getElementById("mic").classList.add("talking");
         console.info("onSpeechStart", e);
+        //if (onSpeechStart) {
+        //    onSpeechStart(e);
+        //}
     };
 
     recognition.onspeechend = function(e) {
         document.getElementById("mic").classList.remove("talking");
         console.info("onSpeechEnd", e);
+        if (onSpeechEnd) {
+            onSpeechEnd(e);
+        }
     };
 
     recognition.onend = function(endEvent) {
@@ -244,7 +358,7 @@ function choose(expectedSentences, onFinished, onError, stopOnError) {
         console.info("onresult", [speechResult], event);
 
         expectedSentences.forEach((expectedSentence, i) => {
-            if(speechResult.trim().toLocaleLowerCase() === expectedSentence.toLocaleLowerCase() && confidence > 0.6) {
+            if(sanitize(speechResult) === sanitize(expectedSentence) && confidence > 0.6) {
                 haveResult = true;
                 recognition.stop();
                 onFinished[i](speechResult, event.results[0][0].confidence);

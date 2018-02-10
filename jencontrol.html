@@ -62,6 +62,7 @@ var msgtext = "";
 var level = 0;
 var real_name = "";
 var user_email = "";
+let recorded_audio_blobs = [];
 
 
 
@@ -167,6 +168,54 @@ function runtask(){
 
           break;
 
+      case 7:
+          two.innerHTML = '';
+          three.innerHTML = '';
+          say('Now as a last in your initiation step we will do the paperwork.')
+              .then(() => say('I want you to read the following displayed consent text aloud. Clear and slowly.'))
+              .then(() => say('Make sure that you mean what you say.'))
+              .then(runtask);
+          break;
+      case 8: {
+          two.innerHTML = 'Please read slowly and clearly:';
+          three.innerHTML = '';
+
+          let sentenceNo = 0;
+          function beforeNextSentence(nextSentence) {
+              if (!document.querySelector(`.recordSentence.no${sentenceNo}`)) {
+                  three.innerHTML += `<span class="recordSentence currentSentence no${sentenceNo}">${nextSentence}</span>&emsp;`
+              }
+          }
+
+          function afterSentence() {
+              document.querySelectorAll('.currentSentence').forEach((el) => el.classList.remove('currentSentence'));
+              sentenceNo++;
+          }
+
+          recordAll([`My name is ${real_name}.`, 'I understand that this is not a game.', 'Hereby I submit myself to Mistress Jennifer.', 'I will obey her commands.', 'I will not question her authority.', 'I will do my tasks.',
+                     'I will suffer to amuse her.', 'Alone I am worthless.'], beforeNextSentence, afterSentence)
+              .then((b)=>{ recorded_audio_blobs = b })
+              .then(() => say("Thanks for your cooperation! We will keep a copy of your spoken confirmation for the records. You may rehear it now."))
+              .then(idle(1000))
+              .then(() => playAudioBlob(recorded_audio_blobs[0]))
+              .then(idle(500))
+              .then(() => playAudioBlob(recorded_audio_blobs[1]))
+              .then(idle(500))
+              .then(() => playAudioBlob(recorded_audio_blobs[2]))
+              .then(idle(500))
+              .then(() => playAudioBlob(recorded_audio_blobs[3]))
+              .then(idle(500))
+              .then(() => playAudioBlob(recorded_audio_blobs[4]))
+              .then(idle(500))
+              .then(() => playAudioBlob(recorded_audio_blobs[5]))
+              .then(idle(500))
+              .then(() => playAudioBlob(recorded_audio_blobs[6]))
+              .then(idle(500))
+              .then(() => playAudioBlob(recorded_audio_blobs[7]))
+              .then(idle(500))
+              .then(() => say('Amazing. Now give us some time to let our A I work through your application. You will hear back from us soon.'));
+          break;
+      }
       case 99:
           one.src="lib_image/jen1.jpg";
           say("Oh that is too bad. See you. Reload the page to start over again.");
@@ -287,7 +336,7 @@ function handleVideo(stream) {
 				navigator.getUserMedia(constraints,handleVideo,videoError);
 			};
 		})
-		.catch(handleError);
+		.catch(console.error);
 	}
 }
  
