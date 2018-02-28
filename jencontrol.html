@@ -160,10 +160,10 @@ function runtask(){
               return document.getElementById("buzzer").play().then(idle(1000));
           }
 
-          repeatAfterMe(['ABC', 'my name is' , 'Which witch watches which swatch watch',
+          repeatAfterMe(['ABC', 'my name is',
               'the answer of life the universe and everything is 42',
-              'How much wood would a woodchuck chuck', 'If a woodchuck could chuck wood',
-              'I could do this the whole day', 'I know a nice pancake recipe',
+              'i belive in pink unicorns',
+              'I could do this the whole day', 'I know a nice pancake recipe', 'any time of the day is a good time for pie',
               'Why do you think are we doing this'], onProgress, ()=>undefined, onMistake);
 
           break;
@@ -192,10 +192,10 @@ function runtask(){
               sentenceNo++;
           }
 
-          recordAll([`My name is ${real_name}.`, 'I understand that this is not a game.', 'Hereby I submit myself to Mistress Jennifer.', 'I will obey her commands.', 'I will not question her authority.', 'I will do my tasks.',
-                     'I will suffer to amuse her.', 'Alone I am worthless.'], beforeNextSentence, afterSentence)
+          recordAll([`My name is ${real_name}.`, 'I am at least 18 years old.', 'I understand that this is not a game.', 'Hereby I submit myself to Mistress Jennifer.', 'I will obey her commands.', 'I will not question her authority.', 'I will do my tasks.',
+                     'I will suffer to amuse her.', 'I consent to do whatever she wants me to do.'], beforeNextSentence, afterSentence)
               .then((b)=>{ recorded_audio_blobs = b })
-              .then(() => say("Thanks for your cooperation! We will keep a copy of your spoken confirmation for the records. You may rehear it now."))
+              .then(() => say("Thanks for your cooperation! We will keep a copy of your spoken consent for the records. You may rehear it now."))
               .then(idle(1000))
               .then(() => playAudioBlob(recorded_audio_blobs[0]))
               .then(idle(500))
