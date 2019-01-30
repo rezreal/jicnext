@@ -497,7 +497,7 @@ function send_clip(durationMillis) {
     // record each active camera but only the first with audio
     activeVideoRecords.forEach((videoTrack, index) => {
         const first = index === 0;
-        recordClip(activeVideoRecords[0].track, first ? audioTrack : undefined, durationMillis)
+        recordClip(videoTrack.track, first ? audioTrack : undefined, durationMillis)
             .then(fakeSendClip);
     });
 }
