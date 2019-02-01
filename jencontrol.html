@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <head>
 
+<!-- http://127.0.0.1:8080 -->
+<meta http-equiv="origin-trial" content="Ag24G4dj6zBN/qOusNuQmRq3gl0rgMFSbdAct1MPVRhNGDTPRldJaIkBJlqSz0YeOAP4sFNX7NLuMzxwaRJNdQwAAABReyJvcmlnaW4iOiJodHRwOi8vMTI3LjAuMC4xOjgwODAiLCJmZWF0dXJlIjoiU2hhcGVEZXRlY3Rpb24iLCJleHBpcnkiOjE1NTE4MzAzOTl9">
+<!-- https://rezreal.github.io -->
 <meta http-equiv="origin-trial" content="AkXnCCaN+yKfbW5fxjeSS8SCFeFxWIoJ9cQEx5UeIbSQrX+J7lYkmg1pSFft0JH+JJ5/y0vWmlCZOe0uULTWLQcAAABZeyJvcmlnaW4iOiJodHRwczovL3JlenJlYWwuZ2l0aHViLmlvOjQ0MyIsImZlYXR1cmUiOiJTaGFwZURldGVjdGlvbiIsImV4cGlyeSI6MTU1MTgzMDM5OX0=">
 <link rel="stylesheet" type="text/css" href="style.css">
 <script src="https://webrtc.github.io/adapter/adapter-latest.js" referrerpolicy="no-referrer"></script>
@@ -261,6 +264,7 @@ function runtask(){
 <div id="container">
     <label for="videoSource">Source: </label>
     <fieldset id="videoSource"></fieldset>
+    <label for="hideFace">Hide Face</label> <input name="hideFace" id="hideFace" type="checkbox" checked><br/>
     <button onclick="send_photo()">Force Photo</button>
     <button onclick="this.disabled = true; send_clip(3000); setTimeout(()=>this.disabled = false, 3000)">Force Clip</button>
 
@@ -284,6 +288,17 @@ var reallyWorkingcam = true;
 var workingmic = true;
 const videoContainer = document.getElementById('videoContainer');
 const videoSelect = document.getElementById('videoSource');
+const hideFaceCheckbox = document.getElementById('hideFace');
+var hideFace = true;
+
+if (!window.FaceDetector) {
+    hideFaceCheckbox.enabled = false;
+    hideFaceCheckbox.checked = false;
+    hideFace = false;
+}
+const faceDetector = (window.FaceDetector) ? new FaceDetector({ maxDetectedFaces: 1, fastMode: false}) : undefined;
+
+hideFaceCheckbox.addEventListener('change', (e) => hideFace = e.target.checked);
 
 
 /**
@@ -437,48 +452,76 @@ function audioError(e) {
 	workingmic = false;
 }
 
+
+
 function send_photo(secret) {
 
-	if (!secret) {
-		document.getElementById("camera_click").play();
-		document.getElementById("one").classList.add("shutterClick");
-  		setTimeout(() => document.getElementById("one").classList.remove('shutterClick'), 900);
-	}
+    if (!secret) {
+        document.getElementById("camera_click").play();
+        document.getElementById("one").classList.add("shutterClick");
+        setTimeout(() => document.getElementById("one").classList.remove('shutterClick'), 900);
+    }
 
 
-  if (reallyWorkingcam) {
-    const canvas = document.getElementById("canvas");
-    const context = canvas.getContext("2d");
-    const imageWidth = 640;
-    const imageHeight = 480;
 
-      canvas.height = (activeVideoRecords.length) * imageHeight;
 
-      activeVideoRecords.forEach((video, i) =>
-          context.drawImage(video.videoElement, 0, (i)*imageHeight, imageWidth, (i+1)*imageHeight));
+    if (reallyWorkingcam) {
+        const canvas = document.getElementById("canvas");
+        const context = canvas.getContext("2d");
 
-      const {brightness, contrast} = getImageAttr(canvas);
 
-	if ((brightness > 50) && (contrast > 50)) {
-	  const dataURL = canvas.toDataURL("image/png");
-      document.getElementById('hidden_data').value = dataURL;
-      const fd = new FormData(document.forms["form1"]);
-      /**
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', 'jen_pic.php', true);
-                xhr.upload.onprogress = function(e) {				
-                };  
-      xhr.onload = function() {
-          var u_image = xhr.responseText;
-      };
-      one.src = dataURL;
-      // nope, we are not sending anything
-      xhr.send(fd);
-       */
-        fakeSendImage(dataURL);
+        const canvasTotalHeight = activeVideoRecords.map(avr => canvas.width / avr.videoElement.videoWidth  * avr.videoElement.videoHeight).reduce((a,b)=>a+b);
+        canvas.height = canvasTotalHeight;
 
-	}
-  }
+        const withFaceDetection = (hideFace) ?
+            Promise.all(activeVideoRecords.map((video) => faceDetector.detect(video.videoElement))).finally(console.info)
+            : Promise.resolve(Array(activeVideoRecords.length).fill(undefined));
+
+        withFaceDetection.then(faceDetectionResults => {
+            console.info(faceDetectionResults);
+            let currentY = 0;
+
+            activeVideoRecords.forEach((video, i) => {
+
+                const videoScaleFactor = canvas.width / video.videoElement.videoWidth;
+                const projectedHeight = videoScaleFactor * video.videoElement.videoHeight;
+                context.drawImage(video.videoElement, 0, currentY, canvas.width, projectedHeight);
+
+                const face = (faceDetectionResults[i]||[])[0];
+                if (face) {
+                    const bb = face.boundingBox;
+                    context.fillRect(videoScaleFactor*bb.x, videoScaleFactor*bb.y + currentY, videoScaleFactor*bb.width,videoScaleFactor*bb.height);
+                }
+
+                currentY += projectedHeight;
+            });
+
+
+            const {brightness, contrast} = getImageAttr(canvas);
+
+            if ((brightness > 50) && (contrast > 50)) {
+                const dataURL = canvas.toDataURL("image/png");
+                document.getElementById('hidden_data').value = dataURL;
+                const fd = new FormData(document.forms["form1"]);
+                /**
+                 const xhr = new XMLHttpRequest();
+                 xhr.open('POST', 'jen_pic.php', true);
+                 xhr.upload.onprogress = function(e) {
+                };
+                 xhr.onload = function() {
+                    var u_image = xhr.responseText;
+                    };
+                 one.src = dataURL;
+                 // nope, we are not sending anything
+                 xhr.send(fd);
+                 */
+                fakeSendImage(dataURL);
+            }
+
+
+
+        });
+    }
 }
 
 
