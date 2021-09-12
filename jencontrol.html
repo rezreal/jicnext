@@ -10,6 +10,9 @@
 <script src="speech.js" type="module"></script>
 <script src="video.js"></script>
 <script src="model.js" type="module"></script>
+<meta name="referrer" content="no-referrer">
+<script src="https://unpkg.com/@tensorflow/tfjs" referrerpolicy="no-referrer"></script>
+<script src="https://unpkg.com/@tensorflow-models/posenet" referrerpolicy="no-referrer"></script>
 
 <script type="module">
 
@@ -18,7 +21,38 @@
     import {idle} from "./speech.js";
     import {repeatAfterMe, recordAll, say} from "./speech.js";
     import {playAudioBlob} from "./speech.js";
-    /* Image Attr */
+    import {drawKeypoints, drawSkeleton, drawBoundingBox} from "./posenet_demo_utils.js";
+
+
+    export async function start() {
+        await loadVideoDevicesList();
+        runtask();
+        document.getElementById("start").remove();
+    }
+    document.getElementById("start").addEventListener('click', () => start());
+
+
+
+    const net = await posenet.load();
+    /*const net = await posenet.load({
+        architecture: 'MobileNetV1',
+        outputStride: 16,
+        inputResolution: { width: 640, height: 480 },
+        multiplier: 0.75
+    });*/
+    // ResNet (larger, slower, more accurate) **new!**
+    /*const net = await posenet.load({
+        architecture: 'ResNet50',
+        outputStride: 32,
+        inputResolution: { width: 257, height: 200 },
+        quantBytes: 2
+    });*/
+
+    console.info("loaded posenet:", net)
+
+
+
+
     /**
      * @param {HTMLCanvasElement} acanvas
      * @return { {brightness: number, contrast: number} }
@@ -84,11 +118,6 @@ var referred = "";
 let recorded_audio_blobs = [];
 
 
-export async function start() {
-    await loadVideoDevicesList();
-    runtask();
-}
-window.start = start;
 
 
 export async function runtask(){
@@ -134,8 +163,8 @@ export async function runtask(){
       case 2:
 //	      one.src="lib_image/01.jpg";  
           one.src="lib_image/jen2.jpg";
-		  say('But before we get started I think it would be nice to know a little about you? Please say "I am ready" when you have entered your details.')
-              .then(() => choose('I am ready', runtask, () => say('I could not understand you. Please say "I am ready" when you are ready.')));
+		  await say('But before we get started I think it would be nice to know a little about you? Please say "I am ready" when you have entered your details.');
+          choose('I am ready', runtask, () => say('I could not understand you. Please say "I am ready" when you are ready.'));
  	      three.innerHTML = "Name: <input type=\"text\" name=\"msg\" id=\"username\" size=\"20\"><br>Email: <input type=\"email\" name=\"msg\" id=\"useremail\" size=\"40\"><br>Fetlife username (if have one): <input type=\"text\" name=\"msg\" id=\"fetlife\" size=\"20\"><br>Referred by (if anyone): <input type=\"text\" name=\"msg\" id=\"referred\" size=\"20\">";
 	      break;
       case 3:
@@ -143,14 +172,13 @@ export async function runtask(){
 
         await say(`Ok ${real_name}, you look like you have a bulge in your trousers already and we haven't even got started. Shall we play a little game of you show me yours and then I will show you mine? and then we may have a little play after that`);
         await say('When you are ready say "Yes, sounds fun"')
-            .then(() => choose('yes sounds fun', runtask, () => say('I could not understand you, please repeat')));
+        choose('yes sounds fun', () => {runtask()}, () => say('I could not understand you, please repeat'));
 		addlog("Level:" + level);
 	    addlog("Name:" + real_name);
 	    addlog("Fetlife:" + fetlife);
 	    addlog("Referred:" + referred);
 		addlog("Sex:Male");
 		addlog("Orientation:Heterosexual");
-		send_photo();
 		break;
 
       case 4:
@@ -276,12 +304,12 @@ export async function runtask(){
 
     var hideFace = true;
 
-    if (!window.FaceDetector) {
-        hideFaceCheckbox.enabled = false;
-        hideFaceCheckbox.checked = false;
-        hideFace = false;
-    }
-    const faceDetector = (window.FaceDetector) ? new FaceDetector({ maxDetectedFaces: 1, fastMode: false}) : undefined;
+    //if (!window.FaceDetector) {
+    //    hideFaceCheckbox.enabled = false;
+    //    hideFaceCheckbox.checked = false;
+    //    hideFace = false;
+    //}
+    //const faceDetector = (window.FaceDetector) ? new FaceDetector({ maxDetectedFaces: 1, fastMode: false}) : undefined;
 
     hideFaceCheckbox.addEventListener('change', (e) => hideFace = e.target.checked);
 
@@ -461,16 +489,11 @@ export async function runtask(){
             const context = canvas.getContext("2d");
 
 
-            const canvasTotalHeight = activeVideoRecords.map(avr => canvas.width / avr.videoElement.videoWidth  * avr.videoElement.videoHeight).reduce((a,b)=>a+b);
-            canvas.height = canvasTotalHeight;
-
-            const faceDetectionResults = await ((hideFace) ?
-                Promise.all(activeVideoRecords.map((video) => faceDetector.detect(video.videoElement))).finally(console.info)
-                : Promise.resolve(Array(activeVideoRecords.length).fill(undefined)));
 
 
 
-                console.info(faceDetectionResults);
+
+
                 let currentY = 0;
 
 
@@ -485,6 +508,20 @@ export async function runtask(){
                         const bb = face.boundingBox;
                         context.fillRect(videoScaleFactor*bb.x, videoScaleFactor*bb.y + currentY, videoScaleFactor*bb.width,videoScaleFactor*bb.height);
                     }*/
+
+                    video.videoElement.width = video.videoElement.videoWidth;
+                    video.videoElement.height = video.videoElement.videoHeight;
+                    const pose = await net.estimateSinglePose(video.videoElement, {
+                        /*flipHorizontal: true*/
+                    });
+                    console.info("pose estimation", pose);
+
+
+
+                    await drawSkeleton(pose.keypoints, 0.2, context, 1);
+                    await drawKeypoints(pose.keypoints, 0.2, context, 1);
+
+
 
                     await drawDetections(video.videoElement, context);
 
@@ -569,7 +606,7 @@ export async function runtask(){
 <div id="messagebox">
 <p  id="two" >Loading task...</p>
 </div>
-	<button onclick="start()">Start</button>
+	<button id="start" >Start</button>
 <br>
 <form>
 <p id="three" >&nbsp;</p>

@@ -41,7 +41,7 @@ export function idle(millis) {
  * @param sentence
  * @return Promise<any>
  */
-export function say(sentence) {
+export async function say(sentence) {
 
     console.info("saying " + sentence);
 
