@@ -29,7 +29,7 @@ window.utterances = [];
  * @param {number} millis
  * @return {promiseFunction}
  */
-function idle(millis) {
+export function idle(millis) {
     return function(value) {
         return new Promise((resolve) => {
             setTimeout(() => resolve(value), millis);
@@ -41,7 +41,7 @@ function idle(millis) {
  * @param sentence
  * @return Promise<any>
  */
-function say(sentence) {
+export function say(sentence) {
 
     console.info("saying " + sentence);
 
@@ -139,7 +139,7 @@ window.onload = function() {
  * @param {Function} onSuccess - called when all sentences have been repeated successfully.
  * @param {Function<Promise<null>>} onMistake - called when the user makes a mistake. Continues when the promise returned by the mistake resolves.
  */
-function repeatAfterMe(sentences, onProgress, onSuccess, onMistake) {
+export function repeatAfterMe(sentences, onProgress, onSuccess, onMistake) {
     if (sentences.length === 0) {
         onSuccess();
         return;
@@ -176,7 +176,7 @@ function repeatAfterMe(sentences, onProgress, onSuccess, onMistake) {
  * @param {sentenceCallback} onSentenceComplete
  * @return {Promise<Blob>} the recorded mediaStream
  */
-function record(sentence, onBeforeSentence, onSentenceComplete) {
+export function record(sentence, onBeforeSentence, onSentenceComplete) {
 
     if (recordStream === undefined) throw new Error('Record stream not available');
 
@@ -221,7 +221,7 @@ function record(sentence, onBeforeSentence, onSentenceComplete) {
  * @param {sentenceCallback} onSentenceComplete
  * @return {Promise<Array<Blob>>} the recorded chunks
  */
-function recordAll(sentences, onBeforeSentence, onSentenceComplete) {
+export function recordAll(sentences, onBeforeSentence, onSentenceComplete) {
     if (!(sentences instanceof Array)) {
         sentences = [ sentences ];
     }
@@ -239,7 +239,7 @@ function recordAll(sentences, onBeforeSentence, onSentenceComplete) {
  *
  * @return {Promise<void>} then the playback is done
  */
-function playAudioBlob(blob) {
+export async function playAudioBlob(blob) {
     const audioElement = document.createElement('audio');
     return new Promise((resolve, reject) => {
         const url = URL.createObjectURL(blob);
@@ -274,7 +274,7 @@ function playAudioBlob(blob) {
  * @param {Function?} onSpeechEnd Called when the speech ends.
  * @return {Function} stopFunction
  */
-function choose(expectedSentences, onFinished, onError, stopOnError, onSoundStart, onSpeechEnd) {
+export function choose(expectedSentences, onFinished, onError, stopOnError, onSoundStart, onSpeechEnd) {
 
     if (!(expectedSentences instanceof Array)) {
         expectedSentences = [ expectedSentences ];

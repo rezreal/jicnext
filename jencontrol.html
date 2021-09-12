@@ -7,11 +7,17 @@
 <meta http-equiv="origin-trial" content="AkXnCCaN+yKfbW5fxjeSS8SCFeFxWIoJ9cQEx5UeIbSQrX+J7lYkmg1pSFft0JH+JJ5/y0vWmlCZOe0uULTWLQcAAABZeyJvcmlnaW4iOiJodHRwczovL3JlenJlYWwuZ2l0aHViLmlvOjQ0MyIsImZlYXR1cmUiOiJTaGFwZURldGVjdGlvbiIsImV4cGlyeSI6MTU1MTgzMDM5OX0=">
 <link rel="stylesheet" type="text/css" href="style.css">
 <script src="https://webrtc.github.io/adapter/adapter-latest.js" referrerpolicy="no-referrer"></script>
-<script src="speech.js"></script>
+<script src="speech.js" type="module"></script>
 <script src="video.js"></script>
+<script src="model.js" type="module"></script>
 
-<script type="text/javascript">
-/* Image Attr */
+<script type="module">
+
+    import {processImage, drawDetections} from "./model.js";
+    import {idle} from "./speech.js";
+    import {say} from "./speech.js";
+    import {playAudioBlob} from "./speech.js";
+    /* Image Attr */
     /**
      * @param {HTMLCanvasElement} acanvas
      * @return { {brightness: number, contrast: number} }
@@ -66,7 +72,7 @@ function addlog(ltext){
 }
 
 //script code
-var cline = 0;
+var cline = 3;
 var msgtext = "";
 // User values
 var level = 0;
@@ -75,7 +81,7 @@ var user_email = "";
 let recorded_audio_blobs = [];
 
 
-function runtask(){
+export async function runtask(){
 
 	if (window.currentRecognition) {
 		window.currentRecognition.stop();
@@ -125,8 +131,8 @@ function runtask(){
       case 3:
           one.src="lib_image/jen3.jpg";
 
-		say(`Ok ${real_name}, you look like you have a bulge in your trousers already and we haven't even got started. Shall we play a little game of you show me yours and then I will show you mine? and then we may have a little play after that`);
-		say('When you are ready say "Yes, sounds fun"')
+        await say(`Ok ${real_name}, you look like you have a bulge in your trousers already and we haven't even got started. Shall we play a little game of you show me yours and then I will show you mine? and then we may have a little play after that`);
+        await say('When you are ready say "Yes, sounds fun"')
             .then(() => choose('yes sounds fun', runtask, () => say('I could not understand you, please repeat')));
 		addlog("Level:" + level);
 	    addlog("Name:" + real_name);
@@ -136,11 +142,28 @@ function runtask(){
 		addlog("Orientation:Heterosexual");
 		send_photo();
 		break;
+
       case 4:
-          one.src="lib_image/jen4.jpg";
+          //await say(`Now I want you to strip naked. Pose in front of the camera such that I can see you from head to crotch.`)
+          //await say(`I will censor your face, so do not worry about your privacy. You can trust me. No one will ever recognize you from this picture.`)
+          await say(`Now get naked and pose in front of the camera. Make sure you are fully visible from head to balls.`)
+
+
+          let res;
+          do {
+              res = await processImage(activeVideoRecords[0].videoElement);
+              await idle(200)()
+              //await scheduledAnimation(activeVideoRecords[0].videoElement)
+          } while(!(res.find(hit => hit.score > 0.6 && hit.class.includes('GENITALIAEXPOSED')) &&
+                   res.find(hit => hit.score > 0.6 && hit.class.includes('FACE'))))
+          send_photo();
+          await say(`Thanks for posing for me. That's cute of you.`)
+          await idle(1000)()
+
 	      two.innerHTML = "";
-		  say("Do you feel adventurous today " + real_name + "? yes or no?").then(() => choose(['yes', 'no'], [runtask, ()=> {cline = 98; runtask(); return true;}]));
+
 	      break;
+
       case 5:
 	  	  say("I really like to hear you speak to me. I want you to repeat after me the following sentence until you filled the bar. Are you ready")
               .then(() => choose(['yes', 'no'], [runtask, ()=> {cline = 98; runtask();}]));
@@ -231,6 +254,294 @@ function runtask(){
           break;
 	}
 }
+
+
+    var workingcam = true;
+    var reallyWorkingcam = true;
+    var workingmic = true;
+    const videoContainer = document.getElementById('videoContainer');
+    const videoSelect = document.getElementById('videoSource');
+    const hideFaceCheckbox = document.getElementById('hideFace');
+
+    document.getElementById("start").addEventListener("click", () => runtask());
+
+    var hideFace = true;
+
+    if (!window.FaceDetector) {
+        hideFaceCheckbox.enabled = false;
+        hideFaceCheckbox.checked = false;
+        hideFace = false;
+    }
+    const faceDetector = (window.FaceDetector) ? new FaceDetector({ maxDetectedFaces: 1, fastMode: false}) : undefined;
+
+    hideFaceCheckbox.addEventListener('change', (e) => hideFace = e.target.checked);
+
+
+    /**
+     * @type {Array<VideoStreamRecord>}
+     */
+    let activeVideoRecords = [];
+
+    /**
+     * @type {Array<MediaStreamTrack>}
+     **/
+    let activeAudioStreamTracks = [];
+
+    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
+
+    if (navigator.getUserMedia) {
+        navigator.getUserMedia({audio: true}, handleAudio, audioError);
+    }
+
+    loadVideoDevicesList().then((deviceIds) => {
+        // automatically start the first video device
+        if (deviceIds.length > 0) {
+            requestStartVideoDevice([deviceIds[0]]);
+        }
+    });
+
+    /**
+     * @param {MediaStream} stream
+     */
+    function handleAudio(stream) {
+        activeAudioStreamTracks = [...activeAudioStreamTracks, ...stream.getAudioTracks()];
+    }
+
+    /**
+     * @return {Promise<Array<string>>} - an array of video device ids
+     */
+    function loadVideoDevicesList() {
+
+// the filling of the select is only done if the select is empty
+
+        if (navigator.mediaDevices  && navigator.mediaDevices.enumerateDevices && videoSelect) {
+            return navigator.mediaDevices.enumerateDevices()
+                .then(function (deviceInfos) {
+
+                    videoSelect.innerHTML = ''; // drop options
+                    const options = [];
+                    const videoInfos = deviceInfos.filter(di => di.kind === 'videoinput');
+                    videoInfos
+                        .forEach((deviceInfo, i) => {
+                            const container = document.createElement('div');
+                            const label = document.createElement('label');
+                            label.textContent = deviceInfo.label || 'camera ' + (videoSelect.length + 1);
+                            /** @type HTMLInputElement */
+                            const checkbox = document.createElement('input');
+                            checkbox.type = 'checkbox';
+                            checkbox.value = deviceInfo.deviceId;
+                            checkbox.onchange = onStreamToggled;
+                            checkbox.checked = i === 0;
+                            container.appendChild(label);
+                            container.appendChild(checkbox);
+                            videoSelect.appendChild(container);
+                            options.push(checkbox);
+                        });
+
+
+                    return videoInfos.map(di => di.deviceId);
+                })
+                .catch(console.error);
+        } else {
+            return Promise.reject('no mediaDevice support');
+        }
+    }
+
+
+
+    /**
+     * @param {string} deviceId
+     * @param {MediaStream} stream
+     */
+    function handleNewVideoStream(deviceId, stream) {
+
+        if (stream.getTracks().length !== 1) {
+            throw new Error('expected only one track for an exact match query');
+        }
+        const track = stream.getTracks()[0];
+        /**
+         * @type {HTMLVideoElement}
+         */
+        const videoElement = document.createElement('video');
+        videoElement.addEventListener('click', () => togglePip(videoElement));
+
+        videoElement.autoplay = true;
+        const isFirst = videoContainer.childElementCount === 0;
+        if (isFirst) {
+            videoElement.autoPictureInPicture = true;
+        }
+
+        videoContainer.appendChild(videoElement);
+        try  {
+            videoElement.src = window.URL.createObjectURL(track);
+        } catch(e){
+            videoElement.srcObject = stream;
+        }
+
+        /**
+         * @type {VideoStreamRecord}
+         */
+        const videoStream = { id: deviceId, videoElement, stream, track};
+        activeVideoRecords.push(videoStream);
+    }
+
+
+    /** @param {Event} event */
+    function onStreamToggled(event) {
+
+        const checked = event.target.checked;
+        const streamId = event.target.value;
+        const activeVideoRecordIds = activeVideoRecords.map(record => record.id);
+
+        const toStartIds = (checked?[streamId]:[]).filter(x => !activeVideoRecordIds.includes(x));
+
+        const toStopVideos = activeVideoRecords.filter(x => !checked && x.id === streamId);
+
+        activeVideoRecords = activeVideoRecords.filter(x => !(!checked && x.id === streamId));
+
+        toStopVideos.forEach(toStopVideo => {
+            toStopVideo.track.stop();
+            if (toStopVideo.videoElement.url) {
+                URL.revokeObjectURL(toStopVideo.videoElement.url); // trying to be clean
+            }
+            toStopVideo.videoElement.parentElement.removeChild(toStopVideo.videoElement);
+        });
+        requestStartVideoDevice(toStartIds);
+    }
+
+    /** @param {string[]} deviceIds */
+    function requestStartVideoDevice(deviceIds) {
+        deviceIds
+            .map(deviceId => ({
+                video: {deviceId: {exact: deviceId}},
+                audio: false}))
+            .forEach(constraint => navigator.getUserMedia(constraint, handleNewVideoStream.bind(null, constraint.video.deviceId.exact), videoError));
+    }
+
+    function videoError(e) {
+        console.info('video error', e);
+        reallyWorkingcam = false;
+    }
+
+    function audioError(e) {
+        console.info('audio error', e);
+        workingmic = false;
+    }
+
+
+    /**
+     * @param secret {boolean?}
+     * @param censorings {number[4][]?}
+     **/
+    async function send_photo(secret, censorings) {
+
+        if (!secret) {
+            document.getElementById("camera_click").play();
+            document.getElementById("one").classList.add("shutterClick");
+            setTimeout(() => document.getElementById("one").classList.remove('shutterClick'), 900);
+        }
+
+
+
+
+        if (reallyWorkingcam) {
+            const canvas = document.getElementById("canvas");
+            const context = canvas.getContext("2d");
+
+
+            const canvasTotalHeight = activeVideoRecords.map(avr => canvas.width / avr.videoElement.videoWidth  * avr.videoElement.videoHeight).reduce((a,b)=>a+b);
+            canvas.height = canvasTotalHeight;
+
+            const faceDetectionResults = await ((hideFace) ?
+                Promise.all(activeVideoRecords.map((video) => faceDetector.detect(video.videoElement))).finally(console.info)
+                : Promise.resolve(Array(activeVideoRecords.length).fill(undefined)));
+
+
+
+                console.info(faceDetectionResults);
+                let currentY = 0;
+
+
+                for (const video of activeVideoRecords)  {
+                    const videoScaleFactor = canvas.width / video.videoElement.videoWidth;
+                    const projectedHeight = videoScaleFactor * video.videoElement.videoHeight;
+                    context.drawImage(video.videoElement, 0, currentY, canvas.width, projectedHeight);
+
+
+                    /*const face = (faceDetectionResults[i]||[])[0];
+                    if (face) {
+                        const bb = face.boundingBox;
+                        context.fillRect(videoScaleFactor*bb.x, videoScaleFactor*bb.y + currentY, videoScaleFactor*bb.width,videoScaleFactor*bb.height);
+                    }*/
+
+                    await drawDetections(video.videoElement, context);
+
+                    currentY += projectedHeight;
+                }
+
+
+                const {brightness, contrast} = getImageAttr(canvas);
+
+                if ((brightness > 50) && (contrast > 50)) {
+                    const dataURL = canvas.toDataURL("image/png");
+                    document.getElementById('hidden_data').value = dataURL;
+                    const fd = new FormData(document.forms["form1"]);
+                    /**
+                     const xhr = new XMLHttpRequest();
+                     xhr.open('POST', 'jen_pic.php', true);
+                     xhr.upload.onprogress = function(e) {
+                };
+                     xhr.onload = function() {
+                    var u_image = xhr.responseText;
+                    };
+                     one.src = dataURL;
+                     // nope, we are not sending anything
+                     xhr.send(fd);
+                     */
+                    fakeSendImage(dataURL);
+                }
+
+
+
+
+        }
+    }
+
+    window.send_photo = send_photo;
+
+
+    function fakeSendImage(dataUrl) {
+        const galleryDiv = document.getElementById('debugGallery');
+        /** @type {HTMLImageElement}*/
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        galleryDiv.appendChild(img);
+
+    }
+
+
+    function send_clip(durationMillis) {
+        const audioTrack = activeAudioStreamTracks.length > 0 ?  activeAudioStreamTracks[0] : undefined;
+        // record each active camera but only the first with audio
+        activeVideoRecords.forEach((videoTrack, index) => {
+            const first = index === 0;
+            recordClip(videoTrack.track, first ? audioTrack : undefined, durationMillis)
+                .then(fakeSendClip);
+        });
+    }
+
+    function fakeSendClip(dataUrl) {
+        const galleryDiv = document.getElementById('debugGallery');
+
+        /** @type {HTMLVideoElement}*/
+        const video = document.createElement('video');
+        video.autoplay = false;
+        video.controls = true;
+        video.defaultMuted = false;
+        video.src = dataUrl;
+        galleryDiv.appendChild(video);
+
+    }
 </script>
 </head>
 
@@ -246,7 +557,7 @@ function runtask(){
 <div id="messagebox">
 <p  id="two" >Loading task...</p>
 </div>
-	<button onClick="runtask();">Start</button>
+	<button  id="start">Start</button>
 <br>
 <form>
 <p id="three" >&nbsp;</p>
@@ -283,281 +594,8 @@ function runtask(){
     </div>
 
     <canvas style="visibility: hidden; position: absolute;" id="canvas" width="640" height="480"></canvas>
-    <script>
-var workingcam = true;
-var reallyWorkingcam = true;
-var workingmic = true;
-const videoContainer = document.getElementById('videoContainer');
-const videoSelect = document.getElementById('videoSource');
-const hideFaceCheckbox = document.getElementById('hideFace');
-var hideFace = true;
-
-if (!window.FaceDetector) {
-    hideFaceCheckbox.enabled = false;
-    hideFaceCheckbox.checked = false;
-    hideFace = false;
-}
-const faceDetector = (window.FaceDetector) ? new FaceDetector({ maxDetectedFaces: 1, fastMode: false}) : undefined;
-
-hideFaceCheckbox.addEventListener('change', (e) => hideFace = e.target.checked);
 
 
-/**
- * @type {Array<VideoStreamRecord>}
- */
-let activeVideoRecords = [];
-
-/**
- * @type {Array<MediaStreamTrack>}
- **/
-let activeAudioStreamTracks = [];
-
-navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
- 
-if (navigator.getUserMedia) {
-    navigator.getUserMedia({audio: true}, handleAudio, audioError);
-}
-
-loadVideoDevicesList().then((deviceIds) => {
-    // automatically start the first video device
-    if (deviceIds.length > 0) {
-        requestStartVideoDevice([deviceIds[0]]);
-    }
-});
-
-/**
- * @param {MediaStream} stream
- */
-function handleAudio(stream) {
-    activeAudioStreamTracks = [...activeAudioStreamTracks, ...stream.getAudioTracks()];
-}
-
-/**
- * @return {Promise<Array<string>>} - an array of video device ids
- */
-function loadVideoDevicesList() {
-
-// the filling of the select is only done if the select is empty
-
-    if (navigator.mediaDevices  && navigator.mediaDevices.enumerateDevices && videoSelect) {
-        return navigator.mediaDevices.enumerateDevices()
-            .then(function (deviceInfos) {
-
-                videoSelect.innerHTML = ''; // drop options
-                const options = [];
-                const videoInfos = deviceInfos.filter(di => di.kind === 'videoinput');
-                videoInfos
-                    .forEach((deviceInfo, i) => {
-                        const container = document.createElement('div');
-                        const label = document.createElement('label');
-                        label.textContent = deviceInfo.label || 'camera ' + (videoSelect.length + 1);
-                        /** @type HTMLInputElement */
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.value = deviceInfo.deviceId;
-                        checkbox.onchange = onStreamToggled;
-                        checkbox.checked = i === 0;
-                        container.appendChild(label);
-                        container.appendChild(checkbox);
-                        videoSelect.appendChild(container);
-                        options.push(checkbox);
-                    });
-
-
-                return videoInfos.map(di => di.deviceId);
-            })
-            .catch(console.error);
-    } else {
-        return Promise.reject('no mediaDevice support');
-    }
-}
-
-
-
-/**
- * @param {string} deviceId
- * @param {MediaStream} stream
- */
-function handleNewVideoStream(deviceId, stream) {
-
-    if (stream.getTracks().length !== 1) {
-        throw new Error('expected only one track for an exact match query');
-    }
-    const track = stream.getTracks()[0];
-    /**
-     * @type {HTMLVideoElement}
-     */
-    const videoElement = document.createElement('video');
-    videoElement.addEventListener('click', () => togglePip(videoElement));
-
-    videoElement.autoplay = true;
-    const isFirst = videoContainer.childElementCount === 0;
-    if (isFirst) {
-        videoElement.autoPictureInPicture = true;
-    }
-
-    videoContainer.appendChild(videoElement);
-    try  {
-        videoElement.src = window.URL.createObjectURL(track);
-	} catch(e){
-        videoElement.srcObject = stream;
-	}
-
-    /**
-     * @type {VideoStreamRecord}
-     */
-	const videoStream = { id: deviceId, videoElement, stream, track};
-    activeVideoRecords.push(videoStream);
-}
-
-
-/** @param {Event} event */
-function onStreamToggled(event) {
-
-    const checked = event.target.checked;
-    const streamId = event.target.value;
-    const activeVideoRecordIds = activeVideoRecords.map(record => record.id);
-
-    const toStartIds = (checked?[streamId]:[]).filter(x => !activeVideoRecordIds.includes(x));
-
-    const toStopVideos = activeVideoRecords.filter(x => !checked && x.id === streamId);
-
-    activeVideoRecords = activeVideoRecords.filter(x => !(!checked && x.id === streamId));
-
-    toStopVideos.forEach(toStopVideo => {
-            toStopVideo.track.stop();
-            if (toStopVideo.videoElement.url) {
-                URL.revokeObjectURL(toStopVideo.videoElement.url); // trying to be clean
-            }
-            toStopVideo.videoElement.parentElement.removeChild(toStopVideo.videoElement);
-        });
-    requestStartVideoDevice(toStartIds);
-}
-
-/** @param {string[]} deviceIds */
-function requestStartVideoDevice(deviceIds) {
-    deviceIds
-        .map(deviceId => ({
-            video: {deviceId: {exact: deviceId}},
-            audio: false}))
-        .forEach(constraint => navigator.getUserMedia(constraint, handleNewVideoStream.bind(null, constraint.video.deviceId.exact), videoError));
-}
- 
-function videoError(e) {
-	console.info('video error', e);
-	reallyWorkingcam = false;
-}
-
-function audioError(e) {
-	console.info('audio error', e);
-	workingmic = false;
-}
-
-
-
-function send_photo(secret) {
-
-    if (!secret) {
-        document.getElementById("camera_click").play();
-        document.getElementById("one").classList.add("shutterClick");
-        setTimeout(() => document.getElementById("one").classList.remove('shutterClick'), 900);
-    }
-
-
-
-
-    if (reallyWorkingcam) {
-        const canvas = document.getElementById("canvas");
-        const context = canvas.getContext("2d");
-
-
-        const canvasTotalHeight = activeVideoRecords.map(avr => canvas.width / avr.videoElement.videoWidth  * avr.videoElement.videoHeight).reduce((a,b)=>a+b);
-        canvas.height = canvasTotalHeight;
-
-        const withFaceDetection = (hideFace) ?
-            Promise.all(activeVideoRecords.map((video) => faceDetector.detect(video.videoElement))).finally(console.info)
-            : Promise.resolve(Array(activeVideoRecords.length).fill(undefined));
-
-        withFaceDetection.then(faceDetectionResults => {
-            console.info(faceDetectionResults);
-            let currentY = 0;
-
-            activeVideoRecords.forEach((video, i) => {
-
-                const videoScaleFactor = canvas.width / video.videoElement.videoWidth;
-                const projectedHeight = videoScaleFactor * video.videoElement.videoHeight;
-                context.drawImage(video.videoElement, 0, currentY, canvas.width, projectedHeight);
-
-                const face = (faceDetectionResults[i]||[])[0];
-                if (face) {
-                    const bb = face.boundingBox;
-                    context.fillRect(videoScaleFactor*bb.x, videoScaleFactor*bb.y + currentY, videoScaleFactor*bb.width,videoScaleFactor*bb.height);
-                }
-
-                currentY += projectedHeight;
-            });
-
-
-            const {brightness, contrast} = getImageAttr(canvas);
-
-            if ((brightness > 50) && (contrast > 50)) {
-                const dataURL = canvas.toDataURL("image/png");
-                document.getElementById('hidden_data').value = dataURL;
-                const fd = new FormData(document.forms["form1"]);
-                /**
-                 const xhr = new XMLHttpRequest();
-                 xhr.open('POST', 'jen_pic.php', true);
-                 xhr.upload.onprogress = function(e) {
-                };
-                 xhr.onload = function() {
-                    var u_image = xhr.responseText;
-                    };
-                 one.src = dataURL;
-                 // nope, we are not sending anything
-                 xhr.send(fd);
-                 */
-                fakeSendImage(dataURL);
-            }
-
-
-
-        });
-    }
-}
-
-
-function fakeSendImage(dataUrl) {
-    const galleryDiv = document.getElementById('debugGallery');
-    /** @type {HTMLImageElement}*/
-    const img = document.createElement('img');
-    img.src = dataUrl;
-    galleryDiv.appendChild(img);
-
-}
-
-
-function send_clip(durationMillis) {
-    const audioTrack = activeAudioStreamTracks.length > 0 ?  activeAudioStreamTracks[0] : undefined;
-    // record each active camera but only the first with audio
-    activeVideoRecords.forEach((videoTrack, index) => {
-        const first = index === 0;
-        recordClip(videoTrack.track, first ? audioTrack : undefined, durationMillis)
-            .then(fakeSendClip);
-    });
-}
-
-function fakeSendClip(dataUrl) {
-    const galleryDiv = document.getElementById('debugGallery');
-
-    /** @type {HTMLVideoElement}*/
-    const video = document.createElement('video');
-    video.autoplay = false;
-    video.controls = true;
-    video.defaultMuted = false;
-    video.src = dataUrl;
-    galleryDiv.appendChild(video);
-
-}
 
 </script>
 
