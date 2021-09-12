@@ -255,6 +255,7 @@ export async function runtask(){
 	}
 }
 
+window.runtask = runtask;
 
     var workingcam = true;
     var reallyWorkingcam = true;
@@ -263,7 +264,7 @@ export async function runtask(){
     const videoSelect = document.getElementById('videoSource');
     const hideFaceCheckbox = document.getElementById('hideFace');
 
-    document.getElementById("start").addEventListener("click", () => runtask());
+
 
     var hideFace = true;
 
@@ -346,6 +347,7 @@ export async function runtask(){
             return Promise.reject('no mediaDevice support');
         }
     }
+    window.loadVideoDevicesList = loadVideoDevicesList;
 
 
 
@@ -557,7 +559,7 @@ export async function runtask(){
 <div id="messagebox">
 <p  id="two" >Loading task...</p>
 </div>
-	<button  id="start">Start</button>
+	<button onclick="loadVideoDevicesList() && runtask()">Start</button>
 <br>
 <form>
 <p id="three" >&nbsp;</p>

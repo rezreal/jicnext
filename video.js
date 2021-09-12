@@ -16,7 +16,7 @@
  * @param {MediaStreamTrack?} audio
  * @param {number} durationMillis
  **/
-function recordClip(video, audio, durationMillis) {
+async function recordClip(video, audio, durationMillis) {
 
     return new Promise((resolve) => {
         const mediaStream = new MediaStream();
