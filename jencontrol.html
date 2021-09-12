@@ -79,7 +79,16 @@ var msgtext = "";
 var level = 0;
 var real_name = "";
 var user_email = "";
+var fetlife = "";
+var referred = "";
 let recorded_audio_blobs = [];
+
+
+export async function start() {
+    await loadVideoDevicesList();
+    runtask();
+}
+window.start = start;
 
 
 export async function runtask(){
@@ -256,8 +265,6 @@ export async function runtask(){
 	}
 }
 
-window.runtask = runtask;
-
     var workingcam = true;
     var reallyWorkingcam = true;
     var workingmic = true;
@@ -295,12 +302,16 @@ window.runtask = runtask;
         navigator.getUserMedia({audio: true}, handleAudio, audioError);
     }
 
-    loadVideoDevicesList().then((deviceIds) => {
-        // automatically start the first video device
-        if (deviceIds.length > 0) {
-            requestStartVideoDevice([deviceIds[0]]);
-        }
-    });
+    const permission = await navigator.permissions.query({name: 'camera'});
+    if (permission.state !== 'prompt') {
+        loadVideoDevicesList().then((deviceIds) => {
+            // automatically start the first video device
+            if (deviceIds.length > 0) {
+                requestStartVideoDevice([deviceIds[0]]);
+            }
+        });
+    }
+
 
     /**
      * @param {MediaStream} stream
@@ -312,14 +323,14 @@ window.runtask = runtask;
     /**
      * @return {Promise<Array<string>>} - an array of video device ids
      */
-    function loadVideoDevicesList() {
+    async function loadVideoDevicesList() {
 
 // the filling of the select is only done if the select is empty
 
         if (navigator.mediaDevices  && navigator.mediaDevices.enumerateDevices && videoSelect) {
-            return navigator.mediaDevices.enumerateDevices()
-                .then(function (deviceInfos) {
-
+            // enforce the permission request for the camera
+            await new Promise((resolve, reject) => navigator.getUserMedia({video: true},resolve, reject) );
+            const deviceInfos = await navigator.mediaDevices.enumerateDevices();
                     videoSelect.innerHTML = ''; // drop options
                     const options = [];
                     const videoInfos = deviceInfos.filter(di => di.kind === 'videoinput');
@@ -339,16 +350,14 @@ window.runtask = runtask;
                             videoSelect.appendChild(container);
                             options.push(checkbox);
                         });
-
-
                     return videoInfos.map(di => di.deviceId);
-                })
-                .catch(console.error);
+
+
         } else {
-            return Promise.reject('no mediaDevice support');
+            throw new Error('no mediaDevice support');
         }
     }
-    window.loadVideoDevicesList = loadVideoDevicesList;
+
 
 
 
@@ -560,7 +569,7 @@ window.runtask = runtask;
 <div id="messagebox">
 <p  id="two" >Loading task...</p>
 </div>
-	<button onclick="loadVideoDevicesList() && runtask()">Start</button>
+	<button onclick="start()">Start</button>
 <br>
 <form>
 <p id="three" >&nbsp;</p>
