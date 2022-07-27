@@ -1,0 +1,1471 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Master Task</title>
+    <meta content="Jennifer Task" name="title">
+    <style>
+        input {
+            font-size:24px;
+        }
+        select {
+            font-size:24px;
+        }
+        body {
+            background: #040707;
+            font-family: "Segoe UI" , Sans-Serif;
+            color: #fff;
+            font-size: 6 pt;
+        }
+
+        a {background: none repeat scroll 0 0 #8CC541;border: 1px solid #FFFFFF;color: #FFFFFF;display: inline-block;font-size: 16px;line-height: 26px;margin-top: 5px;padding: 0 5px 3px;text-decoration: none;}
+
+        #container {
+            position: absolute;
+            margin: 0px auto;
+            padding: 10px;
+            width: 300px;
+            height: 240px;
+            /*    border: 10px #333 solid; */
+
+            left: 20;
+            top: 20; /* set these so Chrome doesn't return 'auto' from getComputedStyle */
+            background: rgba(255,255,255,0.66);
+            border: 2px  solid rgba(0,0,0,0.5);
+            border-radius: 4px; padding: 8px;
+        }
+        #videoElement {
+            width: 300px;
+            height: 200px;
+            background-color: #666;
+        }
+
+        #four {
+            display : none;
+            position: absolute;
+            top: 5%;
+            left: 50%;
+            width: 40%;
+        }
+
+        #five {
+            display : none;
+            position: absolute;
+            top: 5%;
+            left: 50%;
+            width: 40%;
+            height: 70%;
+        }
+
+        #mtext {
+            overflow-y: auto;
+            font-family: "Segoe UI" , Sans-Serif;
+            font-size:24px;
+            color: #000;
+            position: absolute;
+            top: 5%;
+            left: 5%;
+            width: 40%;
+            height: 80%;
+            border: 0px solid #73AD21;
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #000;
+            opacity: 0.8;
+            filter: alpha(opacity=80); /* For IE8 and earlier */
+        }
+        #messagebox {
+        }
+
+        #barb {
+            display : none;
+            position: fixed;
+            bottom: 2%;
+            left: 15px;
+            width: 30px;
+            height: 96%;
+            background-color: #999;
+        }
+        #bar1 {
+            display : none;
+            position: fixed;
+            bottom: 3%;
+            left: 17px;
+            width: 26px;
+            height: 94%;
+            background-color: #9D9;
+        }
+    </style>
+    <script type="text/javascript" src="video.js"></script>
+
+    <script type="text/javascript">
+        /* Image Attr */
+        var brightness = 0;
+        var contrast = 0;
+        function getImageAttr2(img1) {
+            var colorSum = 0;
+            var cMin = 255;
+            var cMax = 0;
+            var r,g,b,avg;
+            for(var x = 0, len = img1.data.length; x < len; x+=4) {
+                r = img1.data[x];
+                g = img1.data[x+1];
+                b = img1.data[x+2];
+
+                avg = Math.floor((r+g+b)/3);
+                if (cMin > avg)
+                    cMin = avg;
+                if (cMax < avg)
+                    cMax = avg;
+                colorSum += avg;
+            }
+            contrast = cMax-cMin;
+            brightness = Math.floor(colorSum / (img1.width*img1.height));
+        }
+
+
+        function getImageAttr(acanvas) {
+            var colorSum = 0;
+            var cMin = 255;
+            var cMax = 0;
+
+            var ctx = acanvas.getContext("2d");
+            ctx.drawImage(acanvas,0,0);
+
+            var imageData = ctx.getImageData(0,0,acanvas.width,acanvas.height);
+            var data = imageData.data;
+            var r,g,b,avg;
+
+            for(var x = 0, len = data.length; x < len; x+=4) {
+                r = data[x];
+                g = data[x+1];
+                b = data[x+2];
+
+                avg = Math.floor((r+g+b)/3);
+                if (cMin > avg)
+                    cMin = avg;
+                if (cMax < avg)
+                    cMax = avg;
+                colorSum += avg;
+            }
+            contrast = cMax-cMin;
+            brightness = Math.floor(colorSum / (acanvas.width*acanvas.height));
+        }
+
+        /*
+          Script for main task
+        */
+        function showbar(l) {
+            var x = document.getElementById("barb");
+            var y = document.getElementById("bar1");
+            if (x.style.display !== "block") {
+                x.style.display = "block";
+                y.style.display = "block";
+            }
+            if (l > 100) l = 100;
+            if (l < 0) l = 0;
+            y.style.height = Math.round(94*(l/100))+"%";
+        }
+        function hidebar() {
+            var x = document.getElementById("barb");
+            var y = document.getElementById("bar1");
+            x.style.display = "none";
+            y.style.display = "none";
+        }
+        function TNow() {
+            var d = new Date();
+            var t= d.getTime();
+            return t;
+        }
+        // Limits = Array
+        //          30 3 4 -1 4 -1 4 2 3 4 1 4 2 0
+        var validate = "1Z234567";
+        var ended = false;
+        function exittask() {
+            if (ended == false) {
+                return "Are you sure you want to leave this page before finished task?";
+            }
+        }
+
+        function addlog(ltext){
+            var logtext = ltext;
+
+            document.getElementById('logmsg').value = logtext;
+            var fd2 = new FormData(document.forms["form2"]);
+            var xhr2 = new XMLHttpRequest();
+            xhr2.open('POST', 'msgb.php', true);
+            xhr2.upload.onprogress = function(e) {
+            };
+            xhr2.onload = function() {
+            };
+            xhr2.send(fd2);
+        }
+
+        //script code
+        var swaps = [];
+        var commands = [
+            "log:Testing task Video Testing", "show:This is a task to record 5 seconds of video", "button:Start", "show:recording", "vidrec:0", "wait:5", "vidstop:0", "show:Finished video recording", "button:Start", "log:End test task Video Testing", "finish:All done"];
+        var cline = -1;
+        var mode = 0;
+        var msgtext = "";
+        var SPLITVAR = [];
+        var List = [];
+        var TEMPVAR1 = 0;
+        var TEMPVAR2 = 0;
+        var TEMPVAR3 = 0;
+        var TEMPVAR4 = 0;
+        var TEMPVAR5 = 0;
+        var TEMPVAR6 = 0;
+        var TEMPVAR7 = 0;
+        var TEMPVAR8 = 0;
+        var TEMPVAR9 = 0;
+        var LASTASK = "";
+        var whileline = 0;
+        var gosub = -1;
+        var loopline = 0;
+        var looptill = 0;
+        var LOOPVAR = 0;
+        var wbutton_on = false;
+        var wbutton_tvar = "";
+        var HARDCORE = false;
+        var L_ANAL = 3;
+        var L_ATM = 3;
+        var L_BONDAGE = 4;
+        var L_CHASTITY = -1;
+        var L_CH_FLEX = 3;
+        var CH_END = 0;
+        var L_CH_TYPICAL = 0;
+        var L_CH_FEE = 0;
+        var L_CH_HOURS = 0;
+        var L_CH_MIN = 1;
+        var L_CH_MAX = 2;
+        var CHASTITY_DESC = "2 keys";
+        var L_CUM = 4;
+        var L_FACE = 1;
+        var L_FINDOM = -1;
+        var L_FITNESS = 5;
+        var L_ONLINE = 4;
+        var L_OUTDOOR = 4;
+        var L_EXHIB = 2;
+        var L_DENIAL = 3;
+        var L_PAIN_G = 4;
+        var L_PAIN_N = 1;
+        var L_INFO = -1;
+        var L_SISSY = 4;
+        var L_SHAVE = 2;
+        var L_WATERSPORT = 0;
+        var L_PERSONALINFO = -1;
+        var L_ATM = 3;
+        var T_BUTTPLUG = true;
+        var T_CANDLE = true;
+        var T_CROP = true;
+        var T_DILDO = true;
+        var T_ESTIM = true;
+        var T_GAG = true;
+        var T_HANDCUFFS = true;
+        var T_HUMBLER = true;
+        var T_NIPPLECLAMPS = true;
+        var P_SEX = "F";
+        var P_TYPE = "S";
+        var S_IDENTIFY = 5;
+        var S_LIKE_W = 1;
+        var S_LIKE_M = 2;
+        var S_LIKE_T = 0;
+        var EN_NOISE = false;
+        var P_JIC = false;
+        var EN_HOME = "own";
+        var ADD_MIS = "KV";
+        var COMPTASKS = 0338;
+        var AGE = 42;
+        var BROWSER = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36 OPR/86.0.4363.50";
+
+        // ****************** GPS Stuff ********************
+        var gps_lon = 0;
+        var gps_lat = 0;
+        function getgps() {
+            // Geolocation API getCurrentPosition method
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(geolocationSuccess, geolocationFailure);
+            }
+        }
+        // Geolocation Success
+        function geolocationSuccess(position) {
+            gps_lat = position.coords.latitude;
+            gps_lon = position.coords.longitude;
+        }
+        function geolocationFailure(positionError) {
+        }
+
+        // ************ New Video Recording Code ***********
+
+
+        let pendingRecording = undefined;
+        let pendingStopper = undefined;
+
+        function start_recording() {
+            if (pendingRecording) { return; }
+            if (!currentMediaStream) {
+                console.error("Could not start_recording. No currentMediaStream found.");
+                return;
+            }
+
+            const stopper = new Promise(function(resolve) {
+                pendingStopper = resolve;
+            });
+
+            const firstLiveVideoTrack = currentMediaStream.getVideoTracks().find(track => track.readyState === "live");
+            const firstLiveAudioTrack = currentMediaStream.getAudioTracks().find(track => track.readyState === "live");
+            pendingRecording = recordClip(firstLiveVideoTrack, firstLiveAudioTrack, stopper);
+        }
+
+        async function stop_recording() {
+            if (!pendingRecording) {
+                console.info("No Record in progress. Can not stop anything.")
+                return;
+            } else {
+                pendingStopper();
+            }
+            const result = pendingRecording;
+
+            pendingRecording = pendingStopper = undefined;
+            const videoBlob = await result;
+
+            send_photo("webm", "", videoBlob);
+
+        }
+
+        // *************** End Video Additions ************
+
+        // prescan to get function names
+        functions = [];
+        for (var i = 0; i < commands.length; i++) {
+            var comm = commands[i].split(":");
+            comm[0] = comm[0].trim();
+            if (comm[0] == "function") {
+                functions.push(comm[1]);
+            }
+        }
+
+        // Handle upload image file
+        function handleFiles(e) {
+            var canvas = document.getElementById("canvas"),
+                context = canvas.getContext("2d");
+            var url = URL.createObjectURL(e.target.files[0]);
+            var img = new Image();
+            img.onload = function() {
+                context.drawImage(img, 0, 0, 640, 480);
+// getImageAttr(canvas);
+// Send stuff (from send_photo function)
+                var dataURL = canvas.toDataURL("image/png");
+                document.getElementById('hidden_data').value = dataURL;
+                var fd = new FormData(document.forms["form1"]);
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', 'msg_pic.php', true);
+                xhr.upload.onprogress = function(e) {
+                };
+                xhr.onload = function() {
+                    u_image = xhr.responseText;
+                };
+                xhr.send(fd);
+// End send stuff
+                runtask();
+            }
+            img.src = url;
+        }
+
+        function runtask(inval){
+            if (wbutton_on) {
+                wbutton_on = false;
+                if (inval == 0) // only need to clear if clicked button
+                    clearTimeout(wbutton_tvar);
+            }
+            if (cline < commands.length) {
+                if ( cline > -1) {
+                    var comm = commands[cline].split(":");
+                    comm[0] = comm[0].trim();
+                    switch (comm[0]) {
+                        case "finish":
+                            if (inval == 1)
+                                addlog("comment:"+asktext.value)
+                            break;
+                        case "asktext":
+// addlog(comm[1]+":"+asktext.value)
+                            LASTASK = asktext.value;
+                            LASTASK = LASTASK.replace(/[^0-9a-zA-Z.:/ =?&_-]/gi, '');
+                            break;
+                        case "asktextp":
+                            LASTASK = asktext.value;
+                            LASTASK = LASTASK.replace(/[^0-9a-zA-Z. ]/gi, '');
+                            break;
+                        case "asknumber":
+                            LASTASK = asktext.value;
+                            LASTASK = LASTASK.replace(",",".");
+                            LASTASK = LASTASK.replace(/[^0-9a-zA-Z. ]/gi, '');
+                            if ((LASTASK == "") || (isNaN(LASTASK)))
+                                cline--;
+                            break;
+                        case "choice":
+//	      addlog("choice:"+inval)
+                            LASTASK = inval;
+                            break;
+                        case "wbutton":
+//           LASTASK 0 = on click, >0 = on time
+                            LASTASK = inval;
+                            break;
+
+                    }
+                }
+                cline++;
+
+                var cline_text = commands[cline].trim();
+                // Now swap all vars etc before split
+                // Swap Assigned Vars
+                for (i = 0; i < swaps.length; i++) {
+                    cline_text = cline_text.replace("$"+swaps[i],eval(swaps[i]));
+                }
+                // Swap vars for values
+                cline_text = cline_text.replace(/TEMP1/g, TEMPVAR1);
+                cline_text = cline_text.replace(/TEMP2/g, TEMPVAR2);
+                cline_text = cline_text.replace(/TEMP3/g, TEMPVAR3);
+                cline_text = cline_text.replace(/TEMP4/g, TEMPVAR4);
+                cline_text = cline_text.replace(/TEMP5/g, TEMPVAR5);
+                cline_text = cline_text.replace(/TEMP6/g, TEMPVAR6);
+                cline_text = cline_text.replace(/TEMP7/g, TEMPVAR7);
+                cline_text = cline_text.replace(/TEMP8/g, TEMPVAR8);
+                cline_text = cline_text.replace(/TEMP9/g, TEMPVAR9);
+
+                cline_text = cline_text.replace(/SPLIT1/g, SPLITVAR[0]);
+                cline_text = cline_text.replace(/SPLIT2/g, SPLITVAR[1]);
+                cline_text = cline_text.replace(/SPLIT3/g, SPLITVAR[2]);
+                cline_text = cline_text.replace(/SPLIT4/g, SPLITVAR[3]);
+                cline_text = cline_text.replace(/SPLIT5/g, SPLITVAR[4]);
+
+                cline_text = cline_text.replace("BRIGHTNESS", brightness);
+                cline_text = cline_text.replace("CONTRAST", contrast);
+                cline_text = cline_text.replace("LASTASK", LASTASK);
+                cline_text = cline_text.replace("LOOPVAR", LOOPVAR);
+                cline_text = cline_text.replace(/MOOD/g, "30");
+                cline_text = cline_text.replace(/LEVEL/g, "2");
+                cline_text = cline_text.replace(/DNAME/g, "James");
+                cline_text = cline_text.replace(/DTITLE/g, "Master");
+                cline_text = cline_text.replace(/SNAME/g, "Jennifer");
+                cline_text = cline_text.replace(/PNAME/g, "Lover  2");
+                cline_text = cline_text.replace(/RNAME/g, "Liz");
+                cline_text = cline_text.replace(/TID/g, "T31834112");
+                cline_text = cline_text.replace(/ELINK/g, "https://play-link.com/jic/msg.php?id=L23561203");
+                cline_text = cline_text.replace(/CHASTITY_DESC/g, "2 keys");
+                cline_text = cline_text.replace("TIMENOW",""+TNow());
+                cline_text = cline_text.replace("STIME","1652177443");
+                cline_text = cline_text.replace("DENIED", "false");
+                cline_text = cline_text.replace("INCHASTITY", "false");
+                cline_text = cline_text.replace("FEMALE", "true");
+                cline_text = cline_text.replace("TRANS", "false");
+                cline_text = cline_text.replace("HAS_PENIS", "false");
+                cline_text = cline_text.replace("HAS_BREASTS", "true");
+
+                var comm = cline_text.split(":");
+
+                comm[0] = comm[0].trim();
+                comm[1] = comm[1].trim();
+                msgtext +=  "<b>"+comm[0]+"</b> "+comm[1]+"<br>";
+//	two.innerHTML = msgtext;
+                //Clear button if displayed.. should check if multiple buttons what was pressed?
+                three.innerHTML = "";
+
+                // Hack so don't need call for user functions (should also allow param)
+                if (functions.indexOf(comm[0]) > -1) {
+                    if (comm.length > 1)
+                        comm[2] = comm[1];
+                    comm[1] = comm[0];
+                    comm[0] = "call";
+                }
+                switch (comm[0]) {
+                    case "image":
+                        if ((comm[1]=="LASTPIC") && (typeof u_image !== "undefined"))
+                            one.src = u_image;
+                        else
+                            one.src=comm[1];
+                        runtask();
+                        break;
+                    case "image2":
+                        if (comm[1]=="CLEAR") {
+                            four.style.display = "none";
+                        } else {
+                            if ((comm[1]=="LASTPIC") && (typeof u_image !== "undefined"))
+                                four.src = u_image;
+                            else
+                                four.src=comm[1];
+                            if (four.style.display !== "block") {
+                                four.style.display = "block";
+                            }
+                        }
+                        runtask();
+                        break;
+                    case "asktext":
+                        two.innerHTML = comm[1];
+                        three.innerHTML = "<input type=\"text\" pattern=\"\[A-Za-z0-9. \]\" name=\"msg\" id=\"asktext\" size=\"20\"><input type=\"button\" onclick=\"runtask()\" value=\"Send\">";
+                        break;
+                    case "asktextp":
+                        two.innerHTML = comm[1];
+                        three.innerHTML = "<input type=\"text\" onselectstart=\"return false\" onpaste=\"return false;\" onCopy=\"return false\" onCut=\"return false\" onDrag=\"return false\" onDrop=\"return false\" autocomplete=off pattern=\"\[A-Za-z0-9. \]\" name=\"msg\" id=\"asktext\" size=\"20\"><input type=\"button\" onclick=\"runtask()\" value=\"Send\">";
+                        break;
+                    case "asknumber":
+                        two.innerHTML = comm[1];
+                        three.innerHTML = "<input type=\"text\" pattern=\"\[0-9.\]\" name=\"msg\" id=\"asktext\" size=\"20\"><input type=\"button\" onclick=\"runtask()\" value=\"Send\">";
+                        break;
+                    case "endloop":
+                        LOOPVAR++;
+                        if (LOOPVAR <= looptill)
+                            cline = loopline;
+                        runtask(); // skip finish if
+                        break;
+                    case "loop":
+                        loopline = cline;
+                        looptill = eval(comm[1]); // how many times to loop
+                        LOOPVAR = 1;
+                        runtask();
+                        break;
+                    case "fi":
+                        runtask(); // skip finish if
+                        break;
+                    case "else":
+                        // only get here if "if" was true so need to skip else condition
+                        var endif = 1;
+                        do {
+                            cline++;
+                            comm = commands[cline].split(":");
+                            if (comm[0].trim() == "fi")
+                                endif--;
+                            if (comm[0].trim() == "if")
+                                endif++;
+                        } while ((cline < commands.length) && (endif > 0));
+                        runtask();
+                        break;
+                    case "if": // reworked to allow else
+                        if (!eval(comm[1])) {
+                            var endif = 1;
+                            do {
+                                cline++;
+                                comm = commands[cline].split(":");
+                                if ((comm[0].trim() == "else") && (endif == 1))
+                                    endif--;
+                                if (comm[0].trim() == "fi")
+                                    endif--;
+                                if (comm[0].trim() == "if")
+                                    endif++;
+                            } while ((cline < commands.length) && (endif > 0));
+                        }
+                        runtask();
+                        break;
+                    case "endwhile":
+                        cline = whileline;
+                        runtask(); // Jump back up to start of while
+                        break;
+                    case "while":
+                        whileline = cline-1;
+                        if (!eval(comm[1])) {
+                            do {
+                                cline++;
+                                comm = commands[cline].split(":");
+                            } while ((cline < commands.length) && (comm[0].trim() != "endwhile"));
+                            //cline++;
+                        }
+                        runtask();
+                        break;
+                    case "function":
+                        var fn_name = comm[1];
+                        do {
+                            cline++;
+                            comm = commands[cline].split(":");
+                        } while ((cline < commands.length) && (comm[0].trim() != "end"));
+                        if (comm[0].trim() == "end") {
+                            commands[cline] = "end:"+fn_name;
+                        }
+                        runtask();
+                        break;
+                    case "exptext" :
+                        addlog("exptext:" + comm[1]);
+                        runtask();
+                        break;
+                    case "expose" :
+                        addlog("expose:" + comm[1] + ":" + comm[2]);
+                        runtask();
+                        break;
+                    case "getgps" :
+                        getgps();
+                        runtask();
+                        break;
+                    case "gpsdist" :
+                        //    getgps(); // Not working yet but will give dist in km from last call to above
+                        runtask();
+                        break;
+                    case "vidrec" :
+                        start_recording();
+                        runtask();
+                        break;
+                    case "vidstop" :
+                        stop_recording();
+                        runtask();
+                        break;
+                    case "broadcast":
+                        addlog("broadcast:" + comm[1]);
+                        runtask();
+                        break;
+                    case "log":
+                        addlog("task log:" + cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "ilog":
+                        addlog("task log: <img src=\"" + comm[1] + "\">");
+                        runtask();
+                        break;
+                    case "peerreview":
+                        addlog("Peer Review:" + cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "joingame":
+                        addlog("Join game:" + comm[1]);
+                        runtask();
+                        break;
+                    case "ai": // ai:HOURS:Message
+                        addlog("dai:"+eval(comm[1])+":"+comm[2]);
+                        runtask();
+                        break;
+                    case "dmsg": // dmsg:HOURS:From:Message
+                        addlog("dmsg:"+eval(comm[1])+":"+comm[2]+":"+comm[3]);
+                        runtask();
+                        break;
+                    case "dtask": // dtask:HOURS:From:Task:expHours(optional)
+                        addlog("dtask:"+eval(comm[1])+":"+comm[2]+":"+comm[3]+":"+comm[4]);
+                        runtask();
+                        break;
+                    case "setmood": // Set mood (if less than current)
+                        addlog("taskmood:"+eval(comm[1]));
+                        runtask();
+                        break;
+                    case "addmis": // Add additional mistress (just use verse letter e.g. addmis:K)
+                        addlog("addmis:"+eval(comm[1]));
+                        runtask();
+                        break;
+                    case "setmaxmood": // Set maxmood (if less than current)
+                        addlog("maxmood:"+eval(comm[1]));
+                        runtask();
+                        break;
+                    case "blackmail":
+                        addlog("blackmail:"+comm[1]+":"+comm[2]);
+                        runtask();
+                        break;
+                    case "cam":
+                        if (comm[1] == "blackmail")
+                            send_photo("b");
+                        else if (comm[1] == "broadcast")
+                            send_photo("br");
+                        else if (comm[1] == "tempexp")
+                            send_photo("te");
+                        else if (comm[1] == "save")
+                            send_photo("sa",comm[2]);
+                        else if (comm[1] == "validate")
+                            send_photo("v");
+                        else if (comm[1] == "temp")
+                            send_photo("t");
+                        else
+                            send_photo("n");
+                        runtask();
+                        break;
+                    case "upload":
+                        three.innerHTML = "<input type=\"file\" id=\"input\"/>";
+                        if ((comm[1] != null) && (comm[1] != "")) {
+                            document.getElementById('cam_type').value = "save";
+                            document.getElementById('cam_extra').value = comm[1];
+                        } else {
+                            document.getElementById('cam_type').value = "normal";
+                        }
+                        input.addEventListener('change', handleFiles, false);
+                        break;
+                    case "split" :
+                        SPLITVAR = eval(cline_text.slice(cline_text.indexOf(":")+1)).split(",");
+                        runtask();
+                        break;
+                    case "savelist" :
+                        var savetemp ="";
+                        for (let i = 0; i < List.length; i++) {
+                            savetemp += List[i];
+                            if (i < (List.length-1))
+                                savetemp += ";";
+                        }
+                        addlog("savetemp1:"+comm[1]+":"+savetemp);
+                        runtask();
+                        break;
+                    case "saveglist" :
+                        var savetemp ="";
+                        for (let i = 0; i < List.length; i++) {
+                            savetemp += List[i];
+                            if (i < (List.length-1))
+                                savetemp += ";";
+                        }
+                        addlog("savegtemp1:"+comm[1]+":"+savetemp);
+                        runtask();
+                        break;
+                    case "setlist" : // split elements with ";"
+                        List = eval(cline_text.slice(cline_text.indexOf(":")+1)).split(";");
+                        runtask();
+                        break;
+                    case "listadd" : // add new elements to list
+                        List.push(eval(cline_text.slice(cline_text.indexOf(":")+1)));
+                        runtask();
+                        break;
+                    case "listdelete" : // delete entry x from list
+                        List.splice(eval(cline_text.slice(cline_text.indexOf(":")+1)), 1);
+                        runtask();
+                        break;
+                    case "settemp1":
+                        TEMPVAR1 = eval(cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "settemp2":
+                        TEMPVAR2 = eval(cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "settemp3":
+                        TEMPVAR3 = eval(cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "settemp4":
+                        TEMPVAR4 = eval(cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "settemp5":
+                        TEMPVAR5 = eval(cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "settemp6":
+                        TEMPVAR6 = eval(cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "settemp7":
+                        TEMPVAR7 = eval(cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "settemp8":
+                        TEMPVAR8 = eval(cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "settemp9":
+                        TEMPVAR9 = eval(cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "savetemp1": // Save temp1 to user store
+                        addlog("savetemp1:"+comm[1]+":"+TEMPVAR1);
+                        runtask();
+                        break;
+                    case "savetemp2": // Save temp2 to user store
+                        addlog("savetemp1:"+comm[1]+":"+TEMPVAR2);
+                        runtask();
+                        break;
+                    case "savetemp3": // Save temp3 to user store
+                        addlog("savetemp1:"+comm[1]+":"+TEMPVAR3);
+                        runtask();
+                        break;
+                    case "savetemp4": // Save temp4 to user store
+                        addlog("savetemp1:"+comm[1]+":"+TEMPVAR4);
+                        runtask();
+                        break;
+                    case "savetemp5": // Save temp5 to user store
+                        addlog("savetemp1:"+comm[1]+":"+TEMPVAR5);
+                        runtask();
+                        break;
+                    case "savetemp6": // Save temp6 to user store
+                        addlog("savetemp1:"+comm[1]+":"+TEMPVAR6);
+                        runtask();
+                        break;
+                    case "savetemp7": // Save temp7 to user store
+                        addlog("savetemp1:"+comm[1]+":"+TEMPVAR7);
+                        runtask();
+                        break;
+                    case "savetemp8": // Save temp8 to user store
+                        addlog("savetemp1:"+comm[1]+":"+TEMPVAR8);
+                        runtask();
+                        break;
+                    case "savetemp9": // Save temp9 to user store
+                        addlog("savetemp1:"+comm[1]+":"+TEMPVAR9);
+                        runtask();
+                        break;
+                    case "savegtemp1": // Save temp1 to user store
+                        addlog("savegtemp1:"+comm[1]+":"+TEMPVAR1);
+                        runtask();
+                        break;
+                    case "savegtemp2": // Save temp1 to user store
+                        addlog("savegtemp1:"+comm[1]+":"+TEMPVAR2);
+                        runtask();
+                        break;
+                    case "savegtemp3": // Save temp1 to user store
+                        addlog("savegtemp1:"+comm[1]+":"+TEMPVAR3);
+                        runtask();
+                        break;
+                    case "savegtemp4": // Save temp1 to user store
+                        addlog("savegtemp1:"+comm[1]+":"+TEMPVAR4);
+                        runtask();
+                        break;
+                    case "locklimits": // e.g. locklimits:2 (in days)
+                        addlog("lock limits:" + comm[1]);
+                        runtask();
+                        break;
+                    case "addwtasks": // e.g. addwtasks:2
+                        addlog("add wtasks:" + comm[1]);
+                        runtask();
+                        break;
+                    case "addmtasks": // e.g. addmtasks:2
+                        addlog("add mtasks:" + comm[1]);
+                        runtask();
+                        break;
+                    case "hctasks": // e.g. addmtasks:2
+                        addlog("set hctasks:" + comm[1]);
+                        runtask();
+                        break;
+                    case "hardcore": // e.g. hardcore:2 days
+                        addlog("hardcore mode:" + comm[1]);
+                        runtask();
+                        break;
+                    case "setchastity": // e.g. setchastity:2 days
+                        addlog("set chastity:" + comm[1]);
+                        runtask();
+                        break;
+                    case "addchastity": // e.g. addchastity:2 days
+                        addlog("add chastity:" + comm[1]);
+                        runtask();
+                        break;
+                    case "addchmin": // e.g. addchmin:2
+                        addlog("add chmin:" + comm[1]);
+                        runtask();
+                        break;
+                    case "addavglmt": // e.g. addavglmt:0.2
+                        addlog("add avglmt:" + comm[1]);
+                        runtask();
+                        break;
+                    case "setdenial": // e.g. setdenial:2 hours
+                        addlog("set denial:" + comm[1]);
+                        runtask();
+                        break;
+                    case "adddenial": // e.g. adddenial:2 hours
+                        addlog("add denial:" + comm[1]);
+                        runtask();
+                        break;
+                    case "msg":
+                        addlog("msg " + cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+                    case "show":
+                        two.innerHTML = cline_text.slice(cline_text.indexOf(":")+1);
+                        runtask();
+                        break;
+                    case "showbar":
+                        var t1 = eval(comm[1]);
+                        showbar(t1);
+                        runtask();
+                        break;
+                    case "hidebar":
+                        hidebar();
+                        runtask();
+                        break;
+                    case "preview": // show or hide?
+                        if (comm[1] == "hide") {
+                            var x = document.getElementById("container");
+                            x.style.display = "none";
+                        } else {
+                            var x = document.getElementById("container");
+                            x.style.display = "block";
+                        }
+                        runtask();
+                        break;
+                    case "capture": // show or hide?
+                        if (comm[1] == "hide") {
+                            var x = document.getElementById("canvas");
+                            x.style.display = "none";
+                        } else {
+                            var x = document.getElementById("canvas");
+                            x.style.display = "block";
+                        }
+                        runtask();
+                        break;
+                    case "task":
+                        ended = true;
+                        window.location.href = 'task.php?dtask='+comm[1];
+                        break;
+                    case "finish":
+                        ended = true;
+                        two.innerHTML = comm[1]+"<br><br><a href=\"index.php\">Return to message view</a>";
+                        three.innerHTML = "<input type=\"text\" pattern=\"\[A-Za-z0-9. \]\" name=\"msg\" id=\"asktext\" size=\"20\"><input type=\"button\" onclick=\"runtask(1)\" value=\"Comment\">";
+                        // runtask(0);
+                        break;
+                    case "choice" :
+                        var choices = comm[1].split(",");
+                        three.innerHTML = "<input type=\"button\" onclick=\"runtask(1)\" value=\""+choices[0]+"\"> <input type=\"button\" onclick=\"runtask(2)\" value=\""+choices[1]+"\">";
+                        if (choices[2] != null)
+                            three.innerHTML += " <input type=\"button\" onclick=\"runtask(3)\" value=\""+choices[2]+"\">";
+                        if (choices[3] != null)
+                            three.innerHTML += " <input type=\"button\" onclick=\"runtask(4)\" value=\""+choices[3]+"\">";
+                        if (choices[4] != null)
+                            three.innerHTML += " <input type=\"button\" onclick=\"runtask(5)\" value=\""+choices[4]+"\">";
+                        if (choices[5] != null)
+                            three.innerHTML += " <input type=\"button\" onclick=\"runtask(6)\" value=\""+choices[5]+"\">";
+                        if (choices[6] != null)
+                            three.innerHTML += " <input type=\"button\" onclick=\"runtask(7)\" value=\""+choices[6]+"\">";
+                        if (choices[7] != null)
+                            three.innerHTML += " <input type=\"button\" onclick=\"runtask(8)\" value=\""+choices[7]+"\">";
+                        break;
+                    case "button" :
+                        three.innerHTML = "<input type=\"button\" onclick=\"runtask()\" value=\""+comm[1]+"\">";
+                        break;
+                    case "sound":
+                        var aud = document.getElementById("whack");
+                        aud.src = "sounds/"+comm[1];
+                        whack.play();
+                        break;
+                    case "speak":
+                        speak(comm[1],'james');
+                        runtask();
+                        break;
+
+                    case "speakjen":
+                        speak(comm[1],'jen');
+                        runtask();
+                        break;
+                    case "speaknat":
+                        speak(comm[1],'nat');
+                        runtask();
+                        break;
+                    case "speakjames":
+                        speak(comm[1],'james');
+                        runtask();
+                        break;
+// trigger:lock:12
+                    case "trigger":
+                        addtrig(comm[1],comm[2]);
+                        break;
+                    case "wait":
+                        setTimeout("runtask()",(eval(comm[1])*1000));
+                        break;
+                    case "waitm":
+                        setTimeout("runtask()",(comm[1]));
+                        break;
+// wbutton:10:press me
+                    case "wbutton":
+                        wbutton_on = true;
+                        wbutton_tvar = setTimeout("runtask(1)",(comm[1]*1000));
+                        three.innerHTML = "<input type=\"button\" onclick=\"runtask(0)\" value=\""+comm[2]+"\">";
+                        break;
+                    case "setupdiff":
+                        setupdiff();
+                        runtask();
+                        break;
+                    case "camdiff":
+                        camdiff();
+                        runtask();
+                        break;
+                    case "label": runtask();
+                        break;
+                    case "goto":
+                        cline = 0;
+                        var label = comm[1];
+                        do {
+                            cline++;
+                            comm = commands[cline].split(":");
+                        } while ((cline < commands.length) && ((comm[0].trim() != "label") || (comm[1].trim() != label)));
+                        runtask();
+                        break;
+                    case "end":
+                        gosub = eval("fn_called_"+comm[1]);
+                        if (gosub >= 0) {
+                            cline = gosub;
+                            gosub = -1;
+                        }
+                        runtask();
+                        break;
+                    case "call":
+                        gosub = cline;
+                        // save param as variable
+                        if (comm.length > 2) {
+                            swaps.push(comm[1]+"_var");
+                            eval(comm[1]+"_var="+comm[2]);
+                        }
+                        eval("fn_called_"+comm[1]+"="+cline);
+                        cline = 0;
+                        var label = comm[1];
+                        do {
+                            cline++;
+                            comm = commands[cline].split(":");
+                        } while ((cline < commands.length) && ((comm[0].trim() != "function") || (comm[1].trim() != label)));
+                        runtask();
+                        break;
+
+                    case "web":
+                        window.open(cline_text.slice(cline_text.indexOf(":")+1));
+                        runtask();
+                        break;
+
+                    case "iframe":
+                        if (comm[1]=="CLEAR") {
+                            five.style.display = "none";
+                        } else {
+                            five.src = cline_text.slice(cline_text.indexOf(":")+1);
+                            if (five.style.display !== "block")
+                                five.style.display = "block";
+                        }
+                        runtask();
+                        break;
+
+                    case "assign":
+                        swaps.push(comm[1]);
+                        eval(comm[1]+"="+comm[2]);
+                        runtask();
+                        break;
+
+                    default:
+                        runtask();
+                }
+            } else {
+                three.innerHTML = "Task complete.. <a href=\"index.php\">Return to Messages</a>";
+            }
+        }
+
+
+        /*
+            switch (Command[0]) {
+              case "askbool": if ( getBoolean(Command[1]) )
+                                addlog(Command[1]+":true")
+                              else
+                                addlog(Command[1]+":false")
+                              break
+        */
+    </script>
+</head>
+
+<body onbeforeunload="return exittask()">
+<img id="one" src="lib_image/Task_James1.jpg" width="100%" />
+<div id="mtext" draggable="true">
+    <div id="messagebox">
+        <p  id="two" >Loading task...</p>
+    </div>
+    <br>
+    <form>
+        <p id="three" >&nbsp;</p>
+        <!-- <button style="height:50px;" onclick="runtask();">restart script</button> -->
+    </form>
+</div>
+
+<img id="four" />
+<iframe id="five" src="https://play-link.com" title="Five"></iframe>
+
+<form method="post" accept-charset="utf-8" name="form2">
+    <input name="id" value="1Z234567"  type="hidden"/>
+    <input name="tid" value="T31834112"  type="hidden"/>
+
+    <input name="msg" id='logmsg' type="hidden"/>
+</form>
+
+<!-- Video capture - should hide? --->
+<div id="container" draggable="true">
+    <video autoplay="true" playsinline id="videoElement">
+    </video>
+    <label for="videoSource">Source: </label><select id="videoSource"></select>
+    <!-- <button style="height:50px;" onclick="send_photo()">Send Photo</button> <button style="height:50px;" onclick="setTimeout('send_photo()', 4000)">Take Photo with delay</button> <br> -->
+    <canvas id="canvas" width="640" height="480"></canvas>
+
+    <form method="post" accept-charset="utf-8" name="form1">
+        <input name="id" value="1Z234567"  type="hidden"/>
+        <input name="tid" value="T31834112"  type="hidden"/>
+        <input name="cam_type" id='cam_type' type="hidden"/>
+        <input name="cam_extra" id='cam_extra' type="hidden"/>
+        <input name="hidden_data" id='hidden_data' type="hidden"/>
+    </form>
+</div>
+<script>
+    var workingcam = true;
+    var video = document.querySelector("#videoElement");
+    var videoSelect = document.querySelector('select#videoSource');
+
+    function drag_start(event) {
+        var style = window.getComputedStyle(event.target, null);
+        event.dataTransfer.setData("text/plain", '0,'+
+            (parseInt(style.getPropertyValue("left"),10) - event.clientX) + ',' + (parseInt(style.getPropertyValue("top"),10) - event.clientY));
+    }
+    function drag_start2(event) {
+        var style = window.getComputedStyle(event.target, null);
+        event.dataTransfer.setData("text/plain", '1,'+
+            (parseInt(style.getPropertyValue("left"),10) - event.clientX) + ',' + (parseInt(style.getPropertyValue("top"),10) - event.clientY));
+    }
+    function drag_over(event) {
+        event.preventDefault();
+        return false;
+    }
+    function drop(event) {
+        var offset = event.dataTransfer.getData("text/plain").split(',');
+        if ((parseInt(offset[0],10)) == 0) {
+            var dm = document.getElementById('container');
+            dm.style.left = (event.clientX + parseInt(offset[1],10)) + 'px';
+            dm.style.top = (event.clientY + parseInt(offset[2],10)) + 'px';
+        } else {
+            var dm = document.getElementById('mtext');
+            dm.style.left = (event.clientX + parseInt(offset[1],10)) + 'px';
+            dm.style.top = (event.clientY + parseInt(offset[2],10)) + 'px';
+        }
+        event.preventDefault();
+        return false;
+    }
+    var dm = document.getElementById('container');
+    dm.addEventListener('dragstart',drag_start,false);
+    document.body.addEventListener('dragover',drag_over,false);
+    document.body.addEventListener('drop',drop,false);
+
+    var dm2 = document.getElementById('mtext');
+    dm2.addEventListener('dragstart',drag_start2,false);
+
+    /**
+     * @type {?MediaStream} the current mediaStream
+     */
+    let currentMediaStream = undefined;
+
+    /**
+     * @param {MediaStream} stream
+     */
+    function handleVideo(stream) {
+        currentMediaStream = stream;
+        if (video.src) {
+            URL.revokeObjectURL(video.src); // trying to be clean
+        }
+        try  {
+            video.src = window.URL.createObjectURL(stream);
+        } catch(e){
+            video.srcObject = stream;
+        }
+
+        // the filling of the select is only done if the select is empty
+        if (navigator.mediaDevices  && navigator.mediaDevices.enumerateDevices && videoSelect.length === 0) {
+            navigator.mediaDevices.enumerateDevices()
+                .then(function (deviceInfos) {
+                    // getting the information of the live camera to have it selected in the select
+                    var videoTracksList = stream.getVideoTracks(),
+                        liveLabel;
+                    for (var i = 0; i < videoTracksList.length; i++) {
+                        var videoTrack = videoTracksList[i];
+                        if (videoTrack.readyState == 'live') {
+                            liveLabel = videoTrack.label;
+                            break;
+                        }
+                    }
+
+                    // filling the select
+                    for (var i = 0; i !== deviceInfos.length; ++i) {
+                        var deviceInfo = deviceInfos[i];
+                        var option = document.createElement('option');
+                        option.value = deviceInfo.deviceId;
+
+                        if (deviceInfo.kind === 'videoinput') {
+                            option.text = deviceInfo.label || 'camera ' + (videoSelect.length + 1);
+                            if (deviceInfo.label == liveLabel)
+                                option.selected = 'selected';
+                            videoSelect.appendChild(option);
+                        }
+                    }
+
+                    // having the select react to change now
+                    videoSelect.onchange = function() {
+                        if (stream) {
+                            stream.getTracks().forEach(function(track) {
+                                track.stop();
+                            });
+                        }
+                        var videoSource = videoSelect.value;
+                        var constraints = {
+                            audio: false,
+                            video: {deviceId: videoSource ? {exact: videoSource} : undefined}
+                        };
+                        startWebcam(constraints, handleVideo,videoError);
+                    };
+                })
+                .catch(videoError);
+        }
+    }
+
+    function videoError(e) {
+        workingcam = false;
+    }
+
+    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
+
+
+    /**
+     * @param {?MediaStreamConstraints} constraints
+     * @param {function(MediaStream):void} handleVideoFn a function that deals with
+     * @param videoErrorFn
+     */
+    function startWebcam(constraints, handleVideoFn, videoErrorFn) {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(handleVideoFn)
+                .catch(videoErrorFn);
+        } else if (navigator.getUserMedia) {
+            navigator.getUserMedia(constraints, handleVideoFn, videoErrorFn);
+        }
+    }
+
+    startWebcam({video: true},handleVideo, videoError);
+
+    // ********************* Motion detection code **********************
+    var camWidth = 640;
+    var camHeight = 480;
+    var oldImage = null;
+    var newImage = null;
+    var checkMovement = false; // is the comparison running or not ?
+    var loopId = null;
+    var webcamready = false; // webcam running ?
+
+    // so we know when the webcam is functioning by setting webcamready
+    // if we load the data of an image before this, the comparison does not mean anything
+    // in this exemple, also used to start the test
+    video.oncanplay = function() {
+        webcamready = true;
+
+        // For Test
+        // setupdiff();
+        //window.setTimeout(camdiff,1000);
+    };
+
+    // version 2
+    function setupdiff() {
+        oldImage = getCurrentWebcamData();
+        if (oldImage) {
+            getImageAttr2(oldImage);
+        }
+    }
+
+    // you can do the action with the diff value in the function or using the returned value
+    function camdiff() {
+        newImage = getCurrentWebcamData();
+        if (oldImage && newImage) {
+            var diff = compareImage(oldImage, newImage);
+
+            // HERE the code that use the diff value. can be NaN if problem
+            // ofc finding a good threshold for detecting movement is important
+
+            //placeholder action to display diff
+            //diffAction(diff);
+            TEMPVAR1 = diff; // put rounded value into "TEMP1"
+
+            oldImage = newImage; // replacement so we can call camdiff in repetition rather
+            // than calling setupdiff each time
+
+            return diff;
+        } else {
+            // setupdiff must be called first
+        }
+    }
+
+    // utility functions for all versions
+
+    function getCurrentWebcamData() {
+        if (workingcam && webcamready) {
+            var canvas = document.getElementById('canvas');
+            canvas.width = camWidth;
+            canvas.height = camHeight;
+            var context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, camWidth, camHeight);
+            var image = context.getImageData(0, 0, camWidth, camHeight);
+            return image;
+        }
+    }
+
+    // FYI, from https://rosettacode.org/wiki/Percentage_difference_between_images#JavaScript
+    function compareImage(img1, img2) {
+        if (img1.width !== img2.width || img1.height != img2.height) {
+            return NaN;
+        }
+        var diff = 0;
+
+        for (var i = 0; i < img1.data.length / 4; i++) {
+            diff += Math.abs(img1.data[4 * i + 0] - img2.data[4 * i + 0]) / 255;
+            diff += Math.abs(img1.data[4 * i + 1] - img2.data[4 * i + 1]) / 255;
+            diff += Math.abs(img1.data[4 * i + 2] - img2.data[4 * i + 2]) / 255;
+        }
+
+        return (100 * diff / (img1.width * img1.height * 3));
+    }
+
+    // placeholder function
+    function diffAction(diff) {
+        document.getElementById('two').innerHTML =  diff + '% difference';
+    }
+    // ********************* Motion detection code **********************
+
+    var u_image;
+
+    /**
+     * @param stype Type of the photo to be sent.
+     * @param extra
+     * @param {Blob?} videoBlob send a video if it is a video
+     */
+    function send_photo(stype,extra = "", videoBlob = undefined) {
+        if (workingcam) {
+            var canvas = document.getElementById("canvas"),
+                context = canvas.getContext("2d");
+            if (stype == "v") // extra resolution for validation pics
+                context.drawImage(video, 0, 0, 800, 600);
+            else
+                context.drawImage(video, 0, 0, 640, 480);
+            getImageAttr(canvas);
+//  var dataURL = canvas.toDataURL('image/jpeg', 0.9);
+            const dataURL = canvas.toDataURL("image/png");
+            document.getElementById('hidden_data').value = dataURL;
+            // Send extra info (just used by save and video for now)
+            document.getElementById('cam_extra').value = extra;
+            if (stype == "b") // Flag as blackmail image?
+                document.getElementById('cam_type').value = "blackmail";
+            else if (stype == "te") // Flag as image to TempExp?
+                document.getElementById('cam_type').value = "tempexp";
+            else if (stype == "sa") // Flag as image to Save to Var?
+                document.getElementById('cam_type').value = "save";
+            else if (stype == "br") // Flag as image to broadcast?
+                document.getElementById('cam_type').value = "broadcast";
+            else if (stype == "t") // Flag as temp image?
+                document.getElementById('cam_type').value = "temp";
+            else if (stype == "vr") // Flag as video image?
+                document.getElementById('cam_type').value = "video";
+            else if (stype == "webm") // Flag as video image?
+                document.getElementById('cam_type').value = "webm";
+            else if (stype == "v") // Flag as validate image?
+                document.getElementById('cam_type').value = "validate";
+            else
+                document.getElementById('cam_type').value = "normal";
+            var fd = new FormData(document.forms["form1"]);
+
+            if (videoBlob) {
+                fd.set("hidden_data", videoBlob, 'video.webm')
+            }
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'msg_pic.php', true);
+            xhr.upload.onprogress = function(e) {
+            };
+            xhr.onload = function() {
+                u_image = xhr.responseText;
+            };
+            xhr.send(fd);
+        } else {
+            // Camera not working - show error for now or mood drop?
+            addlog("Error: Camera failed to operate");
+        }
+    }
+
+    // Process Triggers
+    var xmlhttp = new XMLHttpRequest();
+    var xmlhttp4 = new XMLHttpRequest();
+    var url = "remote.php?id=1Z234567";function ReadTriggers() {
+        xmlhttp.onreadystatechange = function() {
+            if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                var myArr = JSON.parse(xmlhttp.responseText);
+                doTriggers(myArr);
+            }
+        };
+        xmlhttp.open("GET", url, true);
+        xmlhttp.send();
+    }
+    function loadweb(tpage) {
+        xmlhttp4.onreadystatechange = function() {
+            if (xmlhttp4.readyState == 4 && xmlhttp4.status == 200) {
+                // trigger OK
+            }
+        };
+        if (tpage.length > 6) {
+            xmlhttp4.open("GET",tpage,true);
+            xmlhttp4.send();
+        }
+    }
+
+    var srtime;
+    var rt_start = [];
+    var rt_level = [];
+    var rt_duration = [];
+    var rt_device = [];
+
+    function doTriggers(arr) {
+        var i;
+        srtime = arr.servertime;
+        rt_start = [];
+        rt_level = [];
+        rt_duration = [];
+        rt_device = [];
+
+        for(i = 0; i < arr.triggers.length; i++) {
+            rt_start.push(arr.triggers[i].start);
+            rt_level.push(arr.triggers[i].level);
+            rt_duration.push(arr.triggers[i].duration);
+            rt_device.push(arr.triggers[i].device);
+        }
+    }
+    function CheckTriggers() {
+        srtime++;
+        var out = "";
+        var i;
+
+        for(i = 0; i < rt_start.length; i++) {
+            if ((rt_start[i] == srtime) && (rt_device[i] == "cam"))
+                send_photo("n");
+            if ((rt_start[i] == srtime) && (rt_device[i] == "estim"))
+            {
+                var aud = document.getElementById("whack");
+                aud.src = "sounds/Pounder.mp3";
+                whack.play();
+            }
+            if ((rt_start[i] == srtime) && (rt_device[i] == "lock")) {
+                loadweb("https://play-link.com/subcontrol/logsend.php?id=53291Z58732042&msg=device2check");
+                // Should also call stop on rt_duration[i]
+                setTimeout('loadweb("https://play-link.com/subcontrol/logsend.php?id=53291Z58732042&msg=device2uncheck");', (rt_duration[i]*1000));
+            }
+//        out += 'Start:' + rt_start[i] + ' Level: ' + rt_level[i] + ' Duration: ' + rt_duration[i] + ' Device: ' + rt_device[i];
+        }
+        // document.getElementById("id01").innerHTML = out;
+    }
+    ReadTriggers();
+    setInterval('ReadTriggers();', 5000);
+    setInterval('CheckTriggers();', 1000);
+
+</script>
+<!--      Video capture --->
+
+<audio id="whack" src="sounds/tom.wav">
+    Your browser does not support the <code>audio</code> element.
+</audio>
+
+<script>
+    var xmlhttp2 = new XMLHttpRequest();
+    var url2 = "remote.php?id=1Z234567&";function addtrig(nt_device,nt_time) {
+        xmlhttp2.onreadystatechange = function() {
+            if (xmlhttp2.readyState == 4 && xmlhttp2.status == 200) {
+                runtask();
+            }
+        };
+        xmlhttp2.open("GET", url2+"device="+nt_device+"&delay="+nt_time, true);
+        xmlhttp2.send();
+    }
+</script>
+
+
+<div id="barb"></div>
+<div id="bar1"></div>
+
+<script>
+
+    // Start script
+    runtask();
+
+    var aud = document.getElementById("whack");
+    aud.onended = function() {
+        runtask();
+    };
+</script>
+
+<script src="speak.js"></script>
+
+</body>
+
+</html>
+
